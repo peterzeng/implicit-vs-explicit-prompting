@@ -1,0 +1,756 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>AI vs AI Observation</title>
+    <!-- Bootstrap CSS for layout -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #2d3748;
+            --secondary: #4a5568;
+            --accent: #3182ce;
+            --success: #38a169;
+            --danger: #e53e3e;
+            --warning: #d69e2e;
+            --bg-dark: #1a202c;
+            --bg-card: #2d3748;
+            --text-primary: #f7fafc;
+            --text-secondary: #a0aec0;
+            --border-color: #4a5568;
+        }
+
+        body {
+            background: linear-gradient(135deg, var(--bg-dark) 0%, #2d3748 100%);
+            color: var(--text-primary);
+            min-height: 100vh;
+        }
+
+        .observation-header {
+            background: linear-gradient(90deg, var(--accent) 0%, #2b6cb0 100%);
+            padding: 1rem 1.5rem;
+            border-radius: 12px;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 4px 20px rgba(49, 130, 206, 0.3);
+        }
+
+        .observation-header h2 {
+            margin: 0;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+        }
+
+        .stats-badge {
+            background: rgba(255, 255, 255, 0.15);
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            font-weight: 600;
+        }
+
+        .control-panel {
+            background: var(--bg-card);
+            border-radius: 12px;
+            padding: 1.25rem;
+            margin-bottom: 1.5rem;
+            border: 1px solid var(--border-color);
+        }
+
+        .btn-control {
+            padding: 0.75rem 1.5rem;
+            font-weight: 600;
+            border-radius: 8px;
+            transition: all 0.2s ease;
+        }
+
+        .btn-control:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        }
+
+        .btn-control:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .btn-next-turn {
+            background: var(--accent);
+            border: none;
+            color: white;
+        }
+
+        .btn-auto-play {
+            background: var(--success);
+            border: none;
+            color: white;
+        }
+
+        .btn-auto-play.playing {
+            background: var(--warning);
+        }
+
+        .grid-panel {
+            background: var(--bg-card);
+            border-radius: 12px;
+            padding: 1.25rem;
+            border: 1px solid var(--border-color);
+            height: 100%;
+        }
+
+        .grid-panel h5 {
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .director-grid-panel h5::before {
+            content: '';
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--accent);
+        }
+
+        .matcher-grid-panel h5::before {
+            content: '';
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--success);
+        }
+
+        .basket-grid-display {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 6px;
+        }
+
+        .basket-grid-display.small-grid {
+            gap: 4px;
+        }
+
+        .basket-grid-display.small-grid .grid-slot-display .position-badge {
+            font-size: 0.6rem;
+            padding: 1px 4px;
+        }
+
+        .grid-slot-display {
+            aspect-ratio: 1;
+            background: var(--bg-dark);
+            border-radius: 8px;
+            overflow: hidden;
+            position: relative;
+            border: 2px solid transparent;
+        }
+
+        .grid-slot-display img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .grid-slot-display .position-badge {
+            position: absolute;
+            top: 4px;
+            left: 4px;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            font-size: 0.7rem;
+            font-weight: 700;
+            padding: 2px 6px;
+            border-radius: 4px;
+        }
+
+        .grid-slot-display.filled {
+            border-color: var(--success);
+        }
+
+        .grid-slot-display.empty {
+            border-color: var(--border-color);
+            border-style: dashed;
+        }
+
+        .chat-panel-ai {
+            background: var(--bg-card);
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            height: 500px;
+        }
+
+        .chat-header {
+            padding: 1rem 1.25rem;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .chat-header h5 {
+            margin: 0;
+            font-size: 1rem;
+        }
+
+        .turn-counter {
+            background: var(--accent);
+            color: white;
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+
+        .chat-messages-ai {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+
+        .message-ai {
+            max-width: 90%;
+            padding: 0.75rem 1rem;
+            border-radius: 12px;
+            font-size: 0.95rem;
+            line-height: 1.5;
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .message-director {
+            background: linear-gradient(135deg, #3182ce 0%, #2b6cb0 100%);
+            color: white;
+            align-self: flex-start;
+            border-bottom-left-radius: 4px;
+        }
+
+        .message-matcher {
+            background: linear-gradient(135deg, #38a169 0%, #2f855a 100%);
+            color: white;
+            align-self: flex-end;
+            border-bottom-right-radius: 4px;
+        }
+
+        .message-system {
+            background: var(--secondary);
+            color: var(--text-secondary);
+            align-self: center;
+            font-size: 0.85rem;
+            text-align: center;
+        }
+
+        .message-label {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            opacity: 0.8;
+            margin-bottom: 0.25rem;
+            font-weight: 600;
+        }
+
+        .status-bar {
+            padding: 0.75rem 1.25rem;
+            border-top: 1px solid var(--border-color);
+            background: rgba(0, 0, 0, 0.2);
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            font-size: 0.85rem;
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        .status-dot.active {
+            background: var(--success);
+        }
+
+        .status-dot.waiting {
+            background: var(--warning);
+        }
+
+        .status-dot.complete {
+            background: var(--accent);
+            animation: none;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.5;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="container-fluid py-3" id="app">
+        <!-- Header -->
+        <div class="observation-header d-flex justify-content-between align-items-center flex-wrap gap-3">
+            <div>
+                <h2>🤖 AI vs AI Simulation (FastAPI)</h2>
+                <p class="mb-0 opacity-75">Watch two VLM agents collaborate on the basket matching task</p>
+            </div>
+            <div class="d-flex gap-3 flex-wrap">
+                <div class="stats-badge">Models: <span id="models-display" class="text-warning font-monospace">-- vs --</span></div>
+                <div class="stats-badge">Strategy: <span id="strategy-display" class="text-info font-monospace">--</span></div>
+                <div class="stats-badge">Session: <span id="session-display">local_test_1</span></div>
+                <div class="stats-badge">Round <span id="round-display">--</span>/<span id="total-rounds-display">5</span></div>
+            </div>
+        </div>
+
+        <!-- Initialization Panel (only visible if no session started) -->
+        <div class="control-panel" id="init-panel">
+            <h5>Initialize Simulation</h5>
+            <div class="d-flex gap-3 align-items-center flex-wrap">
+                <input type="text" id="session-id-input" class="form-control" style="width: 150px"
+                    placeholder="Session ID" value="local_test_1">
+
+                <div class="input-group" style="width: auto;">
+                    <span class="input-group-text">Director Model</span>
+                    <select class="form-select" id="director-model-select">
+                        <option value="gpt-5.5">gpt-5.5</option>
+                        <option value="gpt-5.4">gpt-5.4</option>
+                        <option value="gpt-4o-mini">gpt-4o-mini</option>
+                        <option value="gpt-4o">gpt-4o</option>
+                        <option value="gpt-5.2">gpt-5.2</option>
+                        <option value="gpt-5">gpt-5</option>
+                        <option value="gemini-3-flash-preview">gemini-3-flash-preview</option>
+                        <option value="gemini-2.5-pro">gemini-2.5-pro</option>
+                    </select>
+                </div>
+
+                <div class="input-group" style="width: auto;">
+                    <span class="input-group-text">Matcher Model</span>
+                    <select class="form-select" id="matcher-model-select">
+                        <option value="gpt-5.5">gpt-5.5</option>
+                        <option value="gpt-5.4">gpt-5.4</option>
+                        <option value="gpt-4o-mini">gpt-4o-mini</option>
+                        <option value="gpt-4o">gpt-4o</option>
+                        <option value="gpt-5.2">gpt-5.2</option>
+                        <option value="gpt-5">gpt-5</option>
+                        <option value="gemini-3-flash-preview">gemini-3-flash-preview</option>
+                        <option value="gemini-2.5-pro">gemini-2.5-pro</option>
+                    </select>
+                </div>
+
+                <div class="input-group" style="width: auto;">
+                    <span class="input-group-text">Strategy</span>
+                    <select class="form-select" id="prompt-strategy-select">
+                        <option value="cameron-prompt">cameron-prompt (Humanlike Single Agent)</option>
+                        <option value="ACL_prompt" selected>ACL_prompt</option>
+                    </select>
+                </div>
+
+                <div class="form-check form-switch d-flex align-items-center gap-2">
+                    <input class="form-check-input" type="checkbox" role="switch" checked id="cross-round-history-toggle">
+                    <label class="form-check-label" for="cross-round-history-toggle">Cross-round history</label>
+                </div>
+
+                <div class="form-check form-switch d-flex align-items-center gap-2">
+                    <input class="form-check-input" type="checkbox" role="switch" id="debug-prompt-context-toggle">
+                    <label class="form-check-label" for="debug-prompt-context-toggle">Debug context</label>
+                </div>
+
+                <button class="btn btn-primary" id="start-sim-btn">Start Simulation Round 1</button>
+            </div>
+        </div>
+
+        <!-- Control Panel -->
+        <div class="control-panel" id="main-control-panel" style="display: none;">
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+                <div class="d-flex gap-2 flex-wrap">
+                    <button type="button" class="btn btn-control btn-next-turn" id="next-turn-btn">
+                        <span class="btn-text">▶ Next Turn</span>
+                    </button>
+                    <button type="button" class="btn btn-control btn-auto-play" id="auto-play-btn">
+                        ⏵⏵ Auto-Play
+                    </button>
+                    <button type="button" class="btn btn-control text-white" id="export-btn"
+                        style="background: var(--secondary); border: none;">
+                        💾 Export Data
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="row g-4" id="main-content" style="display: none;">
+            <!-- Left: Grids -->
+            <div class="col-lg-7">
+                <div class="row g-3">
+                    <!-- Director's Grid -->
+                    <div class="col-12">
+                        <div class="grid-panel director-grid-panel" style="padding: 0.75rem;">
+                            <h5 style="margin-bottom: 0.5rem;">Director's View (Target Sequence)</h5>
+                            <div class="basket-grid-display small-grid" id="director-grid">
+                                <!-- Populated via JS -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Matcher's Sequence -->
+                    <div class="col-12">
+                        <div class="grid-panel matcher-grid-panel" style="padding: 0.75rem;">
+                            <h5 style="margin-bottom: 0.5rem;">Matcher's Sequence (<span id="filled-count">0</span>/12
+                                filled)</h5>
+                            <div class="basket-grid-display small-grid" id="matcher-grid">
+                                <!-- Populated via JS -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Matcher's Candidate Pool -->
+                    <div class="col-12">
+                        <div class="grid-panel" style="padding: 0.75rem;">
+                            <h5
+                                style="color: var(--text-secondary); margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.5rem; text-transform: uppercase; font-size: 0.85rem; letter-spacing: 1px;">
+                                <span
+                                    style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--warning);"></span>
+                                Matcher's Candidate Pool (18 options)
+                            </h5>
+                            <div class="basket-grid-display small-grid" id="matcher-pool-grid">
+                                <!-- Populated via JS -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right: Chat -->
+            <div class="col-lg-5">
+                <div class="chat-panel-ai">
+                    <div class="chat-header">
+                        <h5>💬 AI Dialogue</h5>
+                        <span class="turn-counter">Turn <span id="turn-count">0</span></span>
+                    </div>
+                    <div class="chat-messages-ai" id="chat-messages">
+                        <div class="message-ai message-system">
+                            Click "Next Turn" to start the AI conversation
+                        </div>
+                    </div>
+                    <div class="status-bar">
+                        <div class="status-indicator">
+                            <span class="status-dot active" id="status-dot"></span>
+                            <span id="status-text">Ready</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            let currentSessionId = "";
+            let isAutoPlaying = false;
+            let autoPlayInterval = null;
+            let isProcessing = false;
+
+            const startSimBtn = document.getElementById('start-sim-btn');
+            const nextTurnBtn = document.getElementById('next-turn-btn');
+            const autoPlayBtn = document.getElementById('auto-play-btn');
+            const exportBtn = document.getElementById('export-btn');
+
+            exportBtn.addEventListener('click', async () => {
+                if (!currentSessionId) return;
+                exportBtn.disabled = true;
+                const originalText = exportBtn.innerHTML;
+                exportBtn.innerHTML = '⏳ Exporting...';
+                try {
+                    const res = await fetch(`/api/game/export?session_id=${currentSessionId}`);
+                    if (!res.ok) throw new Error('Export failed');
+                    const blob = await res.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `${currentSessionId}_data.json`;
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    document.body.removeChild(a);
+                } catch (e) {
+                    console.error('Export error:', e);
+                    alert('Failed to export data.');
+                } finally {
+                    exportBtn.innerHTML = originalText;
+                    exportBtn.disabled = false;
+                }
+            });
+
+            startSimBtn.addEventListener('click', async () => {
+                const sid = document.getElementById('session-id-input').value;
+                const directorModel = document.getElementById('director-model-select').value;
+                const matcherModel = document.getElementById('matcher-model-select').value;
+                const strategy = document.getElementById('prompt-strategy-select').value;
+                const crossRoundHistory = document.getElementById('cross-round-history-toggle').checked;
+                const debugPromptContext = document.getElementById('debug-prompt-context-toggle').checked;
+                startSimBtn.disabled = true;
+                startSimBtn.textContent = "Starting...";
+                try {
+                    const res = await fetch('/api/game/start', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            session_id: sid,
+                            round_number: 1,
+                            director_model: directorModel,
+                            matcher_model: matcherModel,
+                            prompt_strategy: strategy,
+                            cross_round_history: crossRoundHistory,
+                            debug_prompt_context: debugPromptContext
+                        })
+                    });
+                    const data = await res.json();
+                    if (data.session_id) {
+                        currentSessionId = data.session_id;
+                        document.getElementById('session-display').textContent = currentSessionId;
+                        document.getElementById('init-panel').style.display = 'none';
+                        document.getElementById('main-control-panel').style.display = 'block';
+                        document.getElementById('main-content').style.display = 'flex';
+
+                        await pollState();
+                    }
+                } catch (e) {
+                    console.error(e);
+                    alert("Failed to start simulation.");
+                }
+                startSimBtn.disabled = false;
+                startSimBtn.textContent = "Start Simulation Round 1";
+            });
+
+            nextTurnBtn.addEventListener('click', async () => {
+                if (isProcessing) return;
+                await executeTurn();
+            });
+
+            autoPlayBtn.addEventListener('click', () => {
+                if (isAutoPlaying) {
+                    isAutoPlaying = false;
+                    autoPlayBtn.textContent = '⏵⏵ Auto-Play';
+                    autoPlayBtn.classList.remove('playing');
+                } else {
+                    isAutoPlaying = true;
+                    autoPlayBtn.textContent = '⏸ Pause';
+                    autoPlayBtn.classList.add('playing');
+                    playLoop();
+                }
+            });
+
+            async function executeTurn() {
+                isProcessing = true;
+                nextTurnBtn.disabled = true;
+                document.getElementById('status-text').textContent = "Thinking...";
+                let shouldStop = false;
+                try {
+                    const res = await fetch('/api/game/turn', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ session_id: currentSessionId })
+                    });
+                    const data = await res.json();
+                    console.log("Turn result:", data);
+                    await pollState();
+                    const totalRounds = Number(data.game_status?.total_rounds || document.getElementById('total-rounds-display').textContent || 5);
+                    if (data.game_status && data.game_status.is_complete && data.game_status.round_number >= totalRounds) {
+                        shouldStop = true;
+                    }
+                } catch (e) {
+                    console.error("Turn failed", e);
+                }
+                isProcessing = false;
+                nextTurnBtn.disabled = false;
+                document.getElementById('status-text').textContent = "Ready";
+                return shouldStop;
+            }
+
+            async function playLoop() {
+                if (!isAutoPlaying) return;
+                const shouldStop = await executeTurn();
+                
+                if (shouldStop) {
+                    isAutoPlaying = false;
+                    autoPlayBtn.textContent = '⏵⏵ Auto-Play';
+                    autoPlayBtn.classList.remove('playing');
+                    document.getElementById('status-text').textContent = "Simulation complete. Exporting...";
+                    document.getElementById('status-dot').className = "status-dot complete";
+                    try {
+                        const exportRes = await fetch(`/api/game/export?session_id=${currentSessionId}&generate_artifacts=true`);
+                        if (!exportRes.ok) throw new Error('Automatic export failed');
+                        document.getElementById('status-text').textContent = "Simulation Complete! 🎉";
+                    } catch (e) {
+                        console.error("Automatic export failed", e);
+                        document.getElementById('status-text').textContent = "Simulation complete. Export failed.";
+                    }
+                    return;
+                }
+                
+                if (isAutoPlaying) {
+                    autoPlayInterval = setTimeout(playLoop, 0);
+                }
+            }
+
+            async function pollState() {
+                if (!currentSessionId) return;
+                try {
+                    const res = await fetch(`/api/game/state?session_id=${currentSessionId}`);
+                    if (!res.ok) {
+                        const err = await res.json();
+                        if (res.status === 404) {
+                            document.getElementById('status-text').textContent = "Session Lost (Server Restarted)";
+                            document.getElementById('status-dot').className = "status-dot waiting";
+                            if (isAutoPlaying) {
+                                autoPlayBtn.click(); // Toggle off
+                            }
+                        }
+                        return;
+                    }
+                    const state = await res.json();
+                    renderState(state);
+                } catch (e) {
+                    console.error("Poll failed", e);
+                }
+            }
+
+            function renderState(state) {
+                document.getElementById('round-display').textContent = state.round_number;
+                document.getElementById('total-rounds-display').textContent = state.status?.total_rounds || 5;
+                const stratDisplay = document.getElementById('strategy-display');
+                if (state.prompt_strategy) {
+                    stratDisplay.textContent = state.prompt_strategy.toUpperCase();
+                }
+                
+                const modelsDisplay = document.getElementById('models-display');
+                if (state.director_model && state.matcher_model) {
+                    modelsDisplay.textContent = `${state.director_model} vs ${state.matcher_model}`;
+                }
+
+                // Director Grid
+                const dGrid = document.getElementById('director-grid');
+                dGrid.innerHTML = '';
+                state.shared_grid.forEach(slot => {
+                    dGrid.innerHTML += `
+                <div class="grid-slot-display filled">
+                    <img src="/static/${slot.image}" alt="Basket">
+                    <span class="position-badge">${slot.basket_id}</span>
+                </div>
+            `;
+                });
+
+                // Matcher Grid
+                const mGrid = document.getElementById('matcher-grid');
+                mGrid.innerHTML = '';
+                let filledCount = 0;
+                // Build 1-12 slots
+                let slotMap = {};
+                (state.partial_sequence || []).forEach(item => {
+                    if (item.position && item.image) {
+                        slotMap[item.position] = item.image;
+                        filledCount++;
+                    }
+                });
+
+                document.getElementById('filled-count').textContent = filledCount;
+
+                for (let i = 1; i <= 12; i++) {
+                    if (slotMap[i]) {
+                        mGrid.innerHTML += `
+                    <div class="grid-slot-display filled">
+                        <img src="/static/${slotMap[i]}" alt="Basket">
+                        <span class="position-badge">${i}</span>
+                    </div>
+                `;
+                    } else {
+                        mGrid.innerHTML += `
+                    <div class="grid-slot-display empty">
+                        <span class="position-badge">${i}</span>
+                    </div>
+                `;
+                    }
+                }
+
+                // Matcher Candidate Pool
+                const pGrid = document.getElementById('matcher-pool-grid');
+                pGrid.innerHTML = '';
+                if (state.matcher_pool && state.matcher_pool.length > 0) {
+                    state.matcher_pool.forEach((img, idx) => {
+                        let isUsed = false;
+                        for (let key in slotMap) {
+                            if (slotMap[key] === img) {
+                                isUsed = true;
+                                break;
+                            }
+                        }
+                        const cssClass = isUsed ? "grid-slot-display filled" : "grid-slot-display";
+                        const opacity = isUsed ? "0.4" : "1.0";
+                        pGrid.innerHTML += `
+                    <div class="${cssClass}" style="opacity: ${opacity};">
+                        <img src="/static/${img}" alt="Candidate">
+                    </div>
+                `;
+                    });
+                } else {
+                    pGrid.innerHTML = '<span class="text-muted small">No pool available</span>';
+                }
+
+                // Chat
+                const chatBox = document.getElementById('chat-messages');
+                chatBox.innerHTML = '';
+                if (state.ai_messages && state.ai_messages.length > 0) {
+                    state.ai_messages.forEach(msg => {
+                        chatBox.innerHTML += `
+                    <div class="message-ai message-${msg.sender_role}">
+                        <div class="message-label">${msg.sender_role.toUpperCase()}</div>
+                        ${msg.text}
+                    </div>
+                `;
+                    });
+                    document.getElementById('turn-count').textContent = state.ai_messages.length;
+                } else {
+                    chatBox.innerHTML = `<div class="message-ai message-system">Conversation empty</div>`;
+                    document.getElementById('turn-count').textContent = 0;
+                }
+                chatBox.scrollTop = chatBox.scrollHeight;
+            }
+        });
+    </script>
+</body>
+
+</html>

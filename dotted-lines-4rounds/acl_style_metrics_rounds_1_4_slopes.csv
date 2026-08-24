@@ -1,0 +1,21 @@
+condition,metric,slope
+"Implicit Prompt, GPT-5.2",accuracy,1.9999999999999982
+"Implicit Prompt, GPT-5.2",words,-39.21999999999998
+"Implicit Prompt, GPT-5.2",turns,-2.3199999999999994
+"Implicit Prompt, GPT-5.2",re_words,-19.619999999999997
+"Implicit Prompt, GPT-5.2",relative_lexical_overlap,0.015689522871206337
+"Implicit Prompt, GPT-5.5",accuracy,0.0
+"Implicit Prompt, GPT-5.5",words,-8.299999999999999
+"Implicit Prompt, GPT-5.5",turns,0.06
+"Implicit Prompt, GPT-5.5",re_words,-9.95
+"Implicit Prompt, GPT-5.5",relative_lexical_overlap,0.02679160420097533
+"Explicit Prompt, GPT-5.2",accuracy,0.24999999999999914
+"Explicit Prompt, GPT-5.2",words,-59.92999999999995
+"Explicit Prompt, GPT-5.2",turns,-1.0999999999999992
+"Explicit Prompt, GPT-5.2",re_words,-30.340000000000003
+"Explicit Prompt, GPT-5.2",relative_lexical_overlap,0.017575091102783744
+"Explicit Prompt, GPT-5.5",accuracy,0.5833333333333339
+"Explicit Prompt, GPT-5.5",words,-14.099999999999998
+"Explicit Prompt, GPT-5.5",turns,0.019999999999999997
+"Explicit Prompt, GPT-5.5",re_words,-8.309999999999993
+"Explicit Prompt, GPT-5.5",relative_lexical_overlap,0.017430555555555546

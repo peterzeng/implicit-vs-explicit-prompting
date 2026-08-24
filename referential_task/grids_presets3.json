@@ -1,0 +1,36 @@
+{
+  "rounds": [
+    {
+      "round": 1,
+      "baskets": [
+        "006.png", "007.png", "008.png", "011.png", "013.png", "014.png", 
+        "016.png", "018.png", "021.png", "024.png", "026.png", "029.png"
+      ]
+    },
+    {
+      "round": 2,
+      "baskets": [
+        "013.png", "021.png", "008.png", "029.png", "006.png", "016.png", 
+        "011.png", "024.png", "026.png", "007.png", "018.png", "014.png"
+      ]
+    },
+    {
+      "round": 3,
+      "baskets": [
+        "026.png", "018.png", "007.png", "014.png", "024.png", "011.png", 
+        "029.png", "006.png", "016.png", "013.png", "021.png", "008.png"
+      ]
+    },
+    {
+      "round": 4,
+      "baskets": [
+        "011.png", "026.png", "013.png", "006.png", "024.png", "008.png", 
+        "018.png", "029.png", "021.png", "007.png", "016.png", "014.png"
+      ]
+    },
+    {
+      "fullList": ["006.png", "007.png", "008.png", "011.png", "013.png", "014.png", "016.png", "018.png", "021.png", "024.png", "026.png", "029.png", "030.png", "031.png", "036.png", "038.png", "043.png", "044.png"]
+    }
+  ]
+}
+

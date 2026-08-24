@@ -1,0 +1,29 @@
+*.otreezip
+.specstory/
+.env
+main/
+_static/ai_debug/
+
+# Local/runtime artifacts
+.DS_Store
+**/.DS_Store
+__pycache__/
+**/__pycache__/
+*.py[cod]
+.ruff_cache/
+
+# Local experiment outputs
+data.sqlite
+# data/archive/
+# data/experiments/
+# data/exported_sessions/
+# data/old/
+prompt_exports/
+# data/
+2026_05_EMNLP_Basket_Prompts/
+old/
+emnlp_results_analysis.md
+emnlp_results_section_draft.md
+# Paper artifact: keep the data placeholder tracked, ignore bulk run output
+data/*
+!data/README.md

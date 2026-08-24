@@ -1,0 +1,75 @@
+AI PROMPTING SYSTEM DOCUMENTATION
+Basket Referential Task
+
+OVERVIEW
+--------
+This EMNLP project compares two prompt strategies:
+
+1. ACL_prompt
+2. cameron-prompt
+
+The AI partner can play either role:
+- DIRECTOR: describes target baskets.
+- MATCHER: identifies baskets from descriptions and fills the sequence.
+
+Both strategies receive the same visual context. They differ only in their text
+instructions and response format.
+
+
+VISUAL CONTEXT
+--------------
+Visual context is injected centrally by `_inject_visual_grid_context()` in
+`referential_task/ai_utils.py`.
+
+Director view:
+- A composite image of the 12 target baskets arranged as the target sequence.
+
+Matcher view:
+- A composite image with the current 12-position sequence at the top.
+- The 18-candidate basket pool at the bottom.
+
+
+ACL_prompt
+----------
+Implementation: `referential_task/prompts/acl.py`
+
+ACL_prompt owns:
+- Role-specific Director/Matcher instructions.
+- Developer-message instruction hierarchy.
+- Pydantic Structured Outputs schemas.
+- The structured JSON contract for `reasoning`, `utterance`, and matcher
+  `selection`.
+
+The `reasoning` field is a concise decision summary, not hidden step-by-step
+chain-of-thought. Only `utterance` is shown to the participant; `selection` and
+`reasoning` are processed server-side and logged for analysis.
+
+
+cameron-prompt
+--------------
+Implementation: `referential_task/prompts/cameron.py`
+
+The Cameron strategy is the humanlike single-agent prompt baseline. It uses the
+same developer-message instruction hierarchy and visual context injection as
+ACL_prompt. The app still asks for structured outputs where supported so
+downstream parsing remains consistent.
+
+
+ACTIVE STRATEGY NAMES
+---------------------
+- `ACL_prompt`
+- `cameron-prompt`
+
+Historical strategy names are no longer accepted. Runtime configuration should
+use only `ACL_prompt` or `cameron-prompt`.
+
+
+TECHNICAL NOTES
+---------------
+1. OpenAI calls use `developer` messages for app-level instructions and `user`
+   messages for task inputs such as images, round starts, and live chat.
+2. ACL_prompt uses OpenAI Structured Outputs through Pydantic schemas when
+   calling OpenAI models.
+3. Gemini calls map `developer` and `system` messages into Gemini system
+   instructions.
+4. The AI-vs-AI dashboard and batch script now default to `ACL_prompt`.

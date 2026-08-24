@@ -1,0 +1,21 @@
+condition,metric,slope
+"ACL prompt, GPT-5.2",accuracy,2.22222222222222
+"ACL prompt, GPT-5.2",words,-36.10000000000003
+"ACL prompt, GPT-5.2",turns,-2.3111111111111122
+"ACL prompt, GPT-5.2",re_words,-16.53333333333332
+"ACL prompt, GPT-5.2",relative_lexical_overlap,0.021563068109947407
+"ACL prompt, GPT-5.5",accuracy,0.0
+"ACL prompt, GPT-5.5",words,-10.422222222222222
+"ACL prompt, GPT-5.5",turns,0.0
+"ACL prompt, GPT-5.5",re_words,-10.422222222222222
+"ACL prompt, GPT-5.5",relative_lexical_overlap,0.0277991386061439
+"Cameron prompt, GPT-5.2",accuracy,0.24999999999999914
+"Cameron prompt, GPT-5.2",words,-59.92999999999995
+"Cameron prompt, GPT-5.2",turns,-1.0999999999999992
+"Cameron prompt, GPT-5.2",re_words,-30.340000000000003
+"Cameron prompt, GPT-5.2",relative_lexical_overlap,0.017575091102783744
+"Cameron prompt, GPT-5.5",accuracy,0.5833333333333339
+"Cameron prompt, GPT-5.5",words,-14.099999999999998
+"Cameron prompt, GPT-5.5",turns,0.019999999999999997
+"Cameron prompt, GPT-5.5",re_words,-8.309999999999993
+"Cameron prompt, GPT-5.5",relative_lexical_overlap,0.017430555555555546
