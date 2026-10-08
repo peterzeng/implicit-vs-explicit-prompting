@@ -57,6 +57,18 @@ Session totals: 265 calls, all with token usage recorded. 2.76M tokens:
 Tokens per round grow from 291k to 784k as history and feedback images
 accumulate, and every ReAct step resends that context.
 
+**Cost: about $4.64** at OpenAI standard prices as of 2026-10-08
+(`gpt-5.5`: $5.00 / $0.50 cached / $30.00 output per 1M; `gpt-5-nano`:
+$0.05 / $0.005 / $0.40):
+- `gpt-5.5` final replies: $4.57 ($3.66 uncached input, $0.19 cached, $0.72 output).
+- `gpt-5-nano` steps: $0.07.
+- Excludes the two end-of-session perception calls (not token-logged, text only).
+
+The largest single call was 17.7K input tokens, well under the 272K
+long-context threshold. Estimates: about $11/session with steps on `gpt-5.5`
+instead of nano, and about $45 (nano steps) or $110 (`gpt-5.5` steps) for 10
+sessions.
+
 **What the traces show:**
 - **The step format works.** `gpt-5-nano` produced 137 steps with no
   malformed output and no invalid basket numbers.
