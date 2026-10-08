@@ -6,7 +6,8 @@ upserts rows keyed by (session_id, round), so re-running on the same session
 updates its rows instead of duplicating them. Paper metrics such as referring-
 expression length and lexical overlap come from `scripts/analyze_metrics.py`;
 this script adds ReAct step counts and token usage alongside accuracy, turns,
-and words.
+words, and the compression metrics from `analyze_metrics.analyze_trace` (free
+deterministic extractor), so they match the paper's definitions.
 
 Usage:
     python scripts/track_react_runs.py data/experiments/ACL/2026-10-08/react-smoke
@@ -23,7 +24,13 @@ from pathlib import Path
 from typing import Any
 
 sys.path.append(str(Path(__file__).resolve().parent))
-from analyze_metrics import find_trace_files, get_content_word_count, load_json_trace  # noqa: E402
+from analyze_metrics import (  # noqa: E402
+    ExtractionConfig,
+    analyze_trace,
+    find_trace_files,
+    get_content_word_count,
+    load_json_trace,
+)
 
 DEFAULT_CSV = Path("docs/react_runs.csv")
 
@@ -44,6 +51,12 @@ FIELDS = [
     "accuracy",
     "turns",
     "words",
+    "director_words",
+    "re_words",
+    "mean_re_length",
+    "relative_lexical_overlap",
+    "jaccard_lexical_overlap",
+    "extracted_objects",
     "matcher_turns",
     "react_turns",
     "react_steps",
@@ -121,6 +134,11 @@ def round_row(record: dict[str, Any]) -> dict[str, Any]:
         "accuracy": float(status.get("accuracy") or 0.0),
         "turns": int(status.get("turn_count", len(messages)) or 0),
         "words": sum(get_content_word_count(m.get("text", "")) for m in messages),
+        "director_words": sum(
+            get_content_word_count(m.get("text", ""))
+            for m in messages
+            if m.get("sender_role") == "director"
+        ),
         "matcher_turns": sum(1 for e in log if isinstance(e, dict) and e.get("ai_role") == "matcher"),
         "react_turns": react_turns,
         "react_steps": react_steps,
@@ -134,6 +152,24 @@ def round_row(record: dict[str, Any]) -> dict[str, Any]:
         "calls": calls,
         "calls_missing_usage": missing_usage,
     }
+
+
+COMPRESSION_FIELDS = (
+    "re_words",
+    "mean_re_length",
+    "relative_lexical_overlap",
+    "jaccard_lexical_overlap",
+    "extracted_objects",
+)
+
+
+def compression_by_round(path: Path) -> dict[int, dict[str, Any]]:
+    """Paper compression metrics per round, via the deterministic extractor."""
+    config = ExtractionConfig(
+        extractor="deterministic", gpt_model="", cache_dir=Path("."), refresh_cache=False
+    )
+    rows, _ = analyze_trace(path, [path.parent], config)
+    return {int(r["round"]): {k: r[k] for k in COMPRESSION_FIELDS} for r in rows}
 
 
 def main() -> None:
@@ -150,10 +186,12 @@ def main() -> None:
 
     added = 0
     for path in find_trace_files(args.paths):
+        compression = compression_by_round(path)
         for record in load_json_trace(path):
             if not isinstance(record, dict) or record.get("round_number") is None:
                 continue
             row = round_row(record)
+            row.update(compression.get(int(record["round_number"]), {}))
             rows[(str(row["session_id"]), str(row["round"]))] = row
             added += 1
 

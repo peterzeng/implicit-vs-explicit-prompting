@@ -132,3 +132,53 @@ def test_tracker_round_row_sums_steps_and_tokens():
     assert row["total_tokens"] == 330
     assert (row["calls"], row["calls_missing_usage"]) == (4, 1)
     assert row["react_roles"] == "matcher" and row["accuracy"] == 91.5
+
+
+def _two_round_session(cross_round_history=True):
+    session = Session({"basket_set": 5, "cross_round_history": cross_round_history})
+    r1 = Player(
+        group=Group(shared_grid=json.dumps([{"image": "images/001.png"}, {"image": "images/002.png"}])),
+        session=session,
+        round_number=1,
+    )
+    r1.group.ai_messages = json.dumps([
+        {"sender_role": "director", "text": "Basket 1 is the tall bunny basket."},
+        {"sender_role": "matcher", "text": "Placing it."},
+        {"sender_role": "director", "text": "Basket 2 is the flat tray."},
+        {"sender_role": "director", "text": "To clarify, the tray has no handle."},
+    ])
+    r1.group.matcher_sequence = json.dumps([
+        {"position": 1, "image": "images/002.png"},
+        {"position": 2, "image": "images/002.png"},
+    ])
+    r2 = Player(
+        group=Group(shared_grid=json.dumps([{"image": "images/002.png"}, {"image": "images/001.png"}])),
+        session=session,
+        round_number=2,
+    )
+    return r1, r2
+
+
+def test_recall_basket_tracks_physical_basket_across_rounds():
+    r1, r2 = _two_round_session()
+    obs = react.run_recall_basket(r2, [1, 2, 13])
+    tray, bunny = obs.split("Basket 2 in the current round:")
+    # Current basket 1 is the round-1 tray (basket 2), with its clarification attached.
+    assert "Round 1 (was basket 2), placed correctly" in tray
+    assert '"Basket 2 is the flat tray." | "To clarify, the tray has no handle."' in tray
+    assert "Round 1 (was basket 1), placed INCORRECTLY" in bunny
+    assert "tall bunny basket" in bunny
+    assert "[13]" in obs
+    assert "first round" in react.run_recall_basket(r1, [1])
+
+
+def test_recall_basket_respects_cross_round_history_switch():
+    _, r2 = _two_round_session(cross_round_history=False)
+    assert "not available" in react.run_recall_basket(r2, [1])
+
+
+def test_recall_basket_is_director_only():
+    assert "recall_basket" in react.build_react_instructions("director", 4)
+    assert "recall_basket" not in react.build_react_instructions("matcher", 4)
+    assert react._parse_step(step("recall_basket", [1]), react.step_schema("matcher")) is None
+    assert react._parse_step(step("recall_basket", [1]), react.step_schema("director")).action == "recall_basket"

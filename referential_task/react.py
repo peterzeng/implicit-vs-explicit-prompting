@@ -10,6 +10,9 @@ may take a few private thought -> action -> observation steps:
 - zoom: view enlarged images of 1-4 baskets side by side
   (matcher: candidate numbers 1-18; director: target positions 1-12)
 - search_history: search earlier dialogue for a word or phrase
+- recall_basket (director only): for baskets in the current grid, what the
+  director said about the same physical basket in earlier rounds and whether
+  it was placed correctly (end-of-round feedback the agents already saw)
 - finish: stop investigating
 
 The resulting scratchpad is appended to the context for one final call that
@@ -30,6 +33,7 @@ from PIL import Image, ImageDraw
 from pydantic import BaseModel, Field
 
 from .ai_providers import call_ai_api, detect_provider_from_model, pop_last_usage
+from .prompt_context import _extract_director_basket_number
 from .state import Player
 from .visual_context import (
     _draw_label_badge,
@@ -42,6 +46,8 @@ DEFAULT_MAX_STEPS = 4
 MAX_ZOOM_BASKETS = 4
 MAX_SEARCH_RESULTS = 8
 MAX_SEARCH_SNIPPET_CHARS = 300
+MAX_RECALL_MESSAGES_PER_ROUND = 3
+MAX_RECALL_SNIPPET_CHARS = 250
 MATCHER_POOL_SIZE = 18
 NUM_POSITIONS = 12
 
@@ -59,6 +65,14 @@ class ReActStep(BaseModel):
     query: str = Field(
         description="Word or phrase to search for with search_history; empty string otherwise.",
     )
+
+
+class DirectorReActStep(ReActStep):
+    action: Literal["zoom", "search_history", "recall_basket", "finish"]
+
+
+def step_schema(role: str) -> type[ReActStep]:
+    return DirectorReActStep if role == "director" else ReActStep
 
 
 def react_enabled(player: Player, role: str) -> bool:
@@ -102,8 +116,18 @@ def react_step_model_config(player: Player, role_model_config: dict[str, Any]) -
 def build_react_instructions(role: str, max_steps: int) -> str:
     if role == "matcher":
         zoom_target = "candidate baskets by their candidate numbers (1-18)"
+        action_options = '"zoom" | "search_history" | "finish"'
+        indices_hint = "numbers for zoom"
+        recall_line = ""
     else:
         zoom_target = "baskets in your target grid by their positions (1-12)"
+        action_options = '"zoom" | "search_history" | "recall_basket" | "finish"'
+        indices_hint = "positions for zoom or recall_basket"
+        recall_line = (
+            f"- recall_basket: for 1-{MAX_ZOOM_BASKETS} baskets in your current grid (positions 1-12), "
+            "see what you said about the same physical basket in earlier rounds and whether it was "
+            "placed correctly in those rounds.\n"
+        )
     return (
         "INVESTIGATION PHASE (private):\n"
         f"Before you reply to your partner, you may take up to {max_steps} investigation steps. "
@@ -111,16 +135,17 @@ def build_react_instructions(role: str, max_steps: int) -> str:
         "Each step, respond with a single JSON object:\n"
         "{\n"
         '  "thought": "brief reasoning about what you still need to know",\n'
-        '  "action": "zoom" | "search_history" | "finish",\n'
-        '  "indices": [numbers for zoom, otherwise []],\n'
+        f'  "action": {action_options},\n'
+        f'  "indices": [{indices_hint}, otherwise []],\n'
         '  "query": "search text for search_history, otherwise empty"\n'
         "}\n\n"
         "Actions:\n"
         f"- zoom: view enlarged images of 1-{MAX_ZOOM_BASKETS} {zoom_target}, side by side.\n"
         "- search_history: search the earlier dialogue (this round and any previous rounds you can see) "
         "for a word or phrase, such as a name your partner used for a basket.\n"
+        f"{recall_line}"
         "- finish: stop investigating and write your reply.\n\n"
-        "You will NOT learn whether any placement is correct until the round ends. "
+        "You will NOT learn whether any placement in the CURRENT round is correct until the round ends. "
         "Choose finish as soon as you have enough information to reply."
     )
 
@@ -255,7 +280,100 @@ def run_search_history(
     return "\n".join(lines)
 
 
-def _parse_step(text: str | None) -> ReActStep | None:
+def _cross_round_history_enabled(player: Player) -> bool:
+    try:
+        return bool(player.session.config.get("cross_round_history", False))
+    except Exception:
+        return False
+
+
+def _director_messages_by_basket(messages: list[dict[str, Any]]) -> dict[int, list[str]]:
+    """Group director messages by the basket they describe.
+
+    A message starting with "Basket N" opens basket N; later director messages
+    without a marker (clarifications) are attributed to the last opened basket.
+    """
+    by_basket: dict[int, list[str]] = {}
+    current = None
+    for msg in messages:
+        if msg.get("sender_role") != "director":
+            continue
+        text = (msg.get("text") or "").strip()
+        if not text:
+            continue
+        current = _extract_director_basket_number(text) or current
+        if current is not None:
+            by_basket.setdefault(current, []).append(text)
+    return by_basket
+
+
+def run_recall_basket(player: Player, positions: list[int]) -> str:
+    """Director-only: earlier-round descriptions and outcomes for current baskets."""
+    if not _cross_round_history_enabled(player):
+        return "OBSERVATION: Earlier rounds are not available in this session."
+    current_round = getattr(player, "round_number", 1) or 1
+    try:
+        prior_rounds = sorted(
+            (p for p in player.in_all_rounds() if (p.round_number or 0) < current_round),
+            key=lambda p: p.round_number,
+        )
+    except Exception:
+        prior_rounds = []
+    if not prior_rounds:
+        return "OBSERVATION: This is the first round; there are no earlier rounds to recall."
+
+    try:
+        grid = json.loads(player.group.shared_grid or "[]")
+    except Exception:
+        grid = []
+
+    unique: list[int] = []
+    for pos in positions:
+        if pos not in unique:
+            unique.append(pos)
+    valid = [p for p in unique[:MAX_ZOOM_BASKETS] if 1 <= p <= len(grid) and grid[p - 1].get("image")]
+    invalid = [p for p in unique[:MAX_ZOOM_BASKETS] if p not in valid]
+    if not valid:
+        return f"OBSERVATION: No valid positions given (valid range is 1-{NUM_POSITIONS})."
+
+    lines = ["OBSERVATION:"]
+    for pos in valid:
+        image = grid[pos - 1]["image"]
+        lines.append(f"Basket {pos} in the current round:")
+        for prev in prior_rounds:
+            try:
+                prev_grid = json.loads(prev.group.shared_grid or "[]")
+                prev_messages = json.loads(prev.group.ai_messages or "[]")
+                submitted = json.loads(prev.group.matcher_sequence or "[]")
+            except Exception:
+                continue
+            prev_pos = next(
+                (i + 1 for i, slot in enumerate(prev_grid) if slot.get("image") == image), None
+            )
+            if prev_pos is None:
+                lines.append(f"  Round {prev.round_number}: not in the target grid.")
+                continue
+            placed = next(
+                (s.get("image") for s in submitted if str(s.get("position")) == str(prev_pos)), None
+            )
+            if placed is None:
+                outcome = "no basket was submitted for it"
+            elif placed == image:
+                outcome = "placed correctly"
+            else:
+                outcome = "placed INCORRECTLY (a different basket was put there)"
+            said = _director_messages_by_basket(prev_messages).get(prev_pos, [])
+            quoted = " | ".join(
+                f'"{t[:MAX_RECALL_SNIPPET_CHARS]}{"..." if len(t) > MAX_RECALL_SNIPPET_CHARS else ""}"'
+                for t in said[:MAX_RECALL_MESSAGES_PER_ROUND]
+            ) or "(no description found)"
+            lines.append(f"  Round {prev.round_number} (was basket {prev_pos}), {outcome}. You said: {quoted}")
+    if invalid:
+        lines.append(f"Ignored invalid positions {invalid}; valid range is 1-{NUM_POSITIONS}.")
+    return "\n".join(lines)
+
+
+def _parse_step(text: str | None, schema: type[ReActStep] = ReActStep) -> ReActStep | None:
     if not text:
         return None
     start = text.find("{")
@@ -263,7 +381,7 @@ def _parse_step(text: str | None) -> ReActStep | None:
     if start == -1 or end <= start:
         return None
     try:
-        return ReActStep.model_validate(json.loads(text[start:end]))
+        return schema.model_validate(json.loads(text[start:end]))
     except Exception:
         return None
 
@@ -293,10 +411,10 @@ def run_react_loop(
                 messages=base_messages + [instructions] + scratchpad,
                 model_config=step_model_config,
                 temperature=0,
-                response_format={"type": "json_schema", "json_schema": ReActStep},
+                response_format={"type": "json_schema", "json_schema": step_schema(role)},
             )
         )
-        step = _parse_step(text)
+        step = _parse_step(text, step_schema(role))
         entry: dict[str, Any] = {
             "step": step_num,
             "model": step_model_config.get("model"),
@@ -317,6 +435,8 @@ def run_react_loop(
 
         if step.action == "zoom":
             obs_text, image_url = run_zoom(player, role, step.indices)
+        elif step.action == "recall_basket":
+            obs_text, image_url = run_recall_basket(player, step.indices), None
         else:
             obs_text, image_url = run_search_history(history, step.query, current_round), None
         entry["observation"] = obs_text

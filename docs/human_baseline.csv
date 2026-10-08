@@ -1,0 +1,5 @@
+round,n_pairs,accuracy_mean,words_mean,words_median,director_words_mean,director_words_median
+1,32,80.21,451.3,374.5,309.9,281.0
+2,32,86.46,305.1,293.5,236.1,217.5
+3,32,90.36,252.4,213.5,196.7,152.5
+4,32,92.19,221.9,161.0,166.1,132.5
