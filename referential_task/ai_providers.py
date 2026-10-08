@@ -224,6 +224,10 @@ def get_model_config_for_role(player: "Player" | None, role: str) -> dict[str, A
 
 _openai_client = None
 
+# The SDK default is 600s; a dead connection (e.g., after a network switch)
+# would stall a run that long before the SDK's automatic retry kicks in.
+OPENAI_TIMEOUT_SECONDS = float(os.environ.get("OPENAI_TIMEOUT_SECONDS", "180"))
+
 
 def get_openai_client():
     """Get or create OpenAI client."""
@@ -245,9 +249,10 @@ def get_openai_client():
         _openai_client = OpenAI(
             base_url=base_url,
             api_key=api_key or "not-needed",
+            timeout=OPENAI_TIMEOUT_SECONDS,
         )
     elif api_key:
-        _openai_client = OpenAI(api_key=api_key)
+        _openai_client = OpenAI(api_key=api_key, timeout=OPENAI_TIMEOUT_SECONDS)
     else:
         logging.warning("[AI_PROVIDERS] No OpenAI API key configured")
         return None
@@ -431,6 +436,48 @@ def convert_messages_to_gemini_format(messages: list[dict], sdk_type: str = "new
 # ---------------------------------------------------------------------------
 
 
+# Token usage of the most recent successful call, for compute accounting.
+# Calls are sequential, so callers read it right after call_ai_api returns.
+_last_usage: dict[str, Any] | None = None
+
+
+def pop_last_usage() -> dict[str, Any] | None:
+    """Return and clear the token usage recorded by the most recent call."""
+    global _last_usage
+    usage, _last_usage = _last_usage, None
+    return usage
+
+
+def _record_openai_usage(model: str, usage: Any) -> None:
+    global _last_usage
+    if usage is None:
+        return
+    prompt_details = getattr(usage, "prompt_tokens_details", None)
+    completion_details = getattr(usage, "completion_tokens_details", None)
+    _last_usage = {
+        "model": model,
+        "input_tokens": getattr(usage, "prompt_tokens", None),
+        "cached_input_tokens": getattr(prompt_details, "cached_tokens", None),
+        "output_tokens": getattr(usage, "completion_tokens", None),
+        "reasoning_tokens": getattr(completion_details, "reasoning_tokens", None),
+        "total_tokens": getattr(usage, "total_tokens", None),
+    }
+
+
+def _record_gemini_usage(model: str, usage: Any) -> None:
+    global _last_usage
+    if usage is None:
+        return
+    _last_usage = {
+        "model": model,
+        "input_tokens": getattr(usage, "prompt_token_count", None),
+        "cached_input_tokens": getattr(usage, "cached_content_token_count", None),
+        "output_tokens": getattr(usage, "candidates_token_count", None),
+        "reasoning_tokens": getattr(usage, "thoughts_token_count", None),
+        "total_tokens": getattr(usage, "total_token_count", None),
+    }
+
+
 def call_ai_api(
     messages: list[dict],
     model_config: dict[str, Any],
@@ -450,9 +497,10 @@ def call_ai_api(
     Returns:
         Response text string or None on failure
     """
+    pop_last_usage()  # never attribute a stale usage record to this call
     provider = model_config.get("provider", PROVIDER_OPENAI)
     model = model_config.get("model", DEFAULT_MODELS[provider])
-    
+
     # logging.info(
         # "[AI_PROVIDERS] Calling %s with model %s",
         # provider.upper(), model
@@ -520,6 +568,7 @@ def _call_openai_api(
             completion = client.beta.chat.completions.parse(**kwargs)
         else:
             completion = client.chat.completions.create(**kwargs)
+        _record_openai_usage(model, getattr(completion, "usage", None))
         reply = completion.choices[0].message.content
         if isinstance(reply, list):
             reply = "".join(
@@ -649,6 +698,7 @@ def _call_gemini_new_sdk(
             contents=contents,
             config=config,
         )
+        _record_gemini_usage(model_name, getattr(response, "usage_metadata", None))
         
         logging.info("[AI_PROVIDERS] Gemini API call completed, processing response...")
         

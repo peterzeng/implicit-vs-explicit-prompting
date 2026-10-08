@@ -29,7 +29,7 @@ from typing import Any, Callable, List, Literal
 from PIL import Image, ImageDraw
 from pydantic import BaseModel, Field
 
-from .ai_providers import call_ai_api, detect_provider_from_model
+from .ai_providers import call_ai_api, detect_provider_from_model, pop_last_usage
 from .state import Player
 from .visual_context import (
     _draw_label_badge,
@@ -297,7 +297,11 @@ def run_react_loop(
             )
         )
         step = _parse_step(text)
-        entry: dict[str, Any] = {"step": step_num, "model": step_model_config.get("model")}
+        entry: dict[str, Any] = {
+            "step": step_num,
+            "model": step_model_config.get("model"),
+            "usage": pop_last_usage(),
+        }
         if step is None:
             entry["error"] = "unparseable step"
             entry["raw_text"] = text

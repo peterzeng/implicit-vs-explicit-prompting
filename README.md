@@ -150,7 +150,10 @@ still arrives only at the end of a round.
 - `--react-step-model`: model for the investigation steps (defaults to each role's model; final replies always use the role's model).
 - `--react-roles`: roles that use ReAct, e.g. `matcher` (default `director,matcher`).
 
-Each step is logged under `react_trace` in the round's `ai_reasoning_log`.
+Each step is logged under `react_trace` in the round's `ai_reasoning_log`, with token usage per call.
+`scripts/track_react_runs.py <export folder>` adds a run to `docs/react_runs.csv`
+(one row per session-round); `docs/react_runs.md` is the run log and
+`docs/react_baseline_writeup.md` summarizes the design and results so far.
 
 ## Data And Exports
 

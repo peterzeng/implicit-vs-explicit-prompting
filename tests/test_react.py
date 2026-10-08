@@ -98,3 +98,37 @@ def test_loop_respects_max_steps_and_survives_bad_output(monkeypatch):
     scratchpad, trace = run_react_loop(make_player(), "director", [], [], {}, max_steps=3)
     assert trace[0]["error"] == "unparseable step"
     assert scratchpad == []
+
+
+def test_tracker_round_row_sums_steps_and_tokens():
+    import sys
+    from pathlib import Path
+
+    sys.path.append(str(Path(__file__).resolve().parents[1] / "scripts"))
+    from track_react_runs import round_row
+
+    usage = {"input_tokens": 100, "cached_input_tokens": 40, "output_tokens": 10, "total_tokens": 110}
+    record = {
+        "session_id": "s1",
+        "round_number": 2,
+        "config": {"react": True, "react_roles": ["matcher"], "react_step_model": "tiny"},
+        "status": {"accuracy": 91.5, "turn_count": 2},
+        "ai_messages": [{"text": "big round basket"}, {"text": "got it"}],
+        "ai_reasoning_log": [
+            {"ai_role": "director", "usage": usage, "react_trace": None},
+            {
+                "ai_role": "matcher",
+                "usage": usage,
+                "react_trace": [
+                    {"action": "zoom", "usage": usage},
+                    {"action": "finish", "usage": None},
+                ],
+            },
+        ],
+    }
+    row = round_row(record)
+    assert (row["react_turns"], row["react_steps"], row["zoom_steps"], row["finish_steps"]) == (1, 2, 1, 1)
+    assert row["final_input_tokens"] == 200 and row["step_input_tokens"] == 100
+    assert row["total_tokens"] == 330
+    assert (row["calls"], row["calls_missing_usage"]) == (4, 1)
+    assert row["react_roles"] == "matcher" and row["accuracy"] == 91.5

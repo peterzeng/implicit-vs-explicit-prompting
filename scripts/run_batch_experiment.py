@@ -24,6 +24,30 @@ from referential_task.ai_vs_ai import get_ai_vs_ai_status
 
 DB_FILE = "data.sqlite"
 
+def init_db():
+    """Create the game_sessions table if needed (same schema as main.py)."""
+    conn = sqlite3.connect(DB_FILE)
+    conn.execute('''
+        CREATE TABLE IF NOT EXISTS game_sessions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            session_id TEXT,
+            round_number INTEGER,
+            config TEXT,
+            shared_grid TEXT,
+            target_baskets TEXT,
+            ai_partial_sequence TEXT,
+            ai_messages TEXT,
+            ai_reasoning_log TEXT,
+            matcher_sequence TEXT,
+            status TEXT,
+            ai_director_reasoning TEXT,
+            ai_matcher_reasoning TEXT,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    conn.commit()
+    conn.close()
+
 def get_total_rounds(session=None):
     """Return the configured number of rounds, falling back to the task default."""
     try:
@@ -310,6 +334,7 @@ if __name__ == "__main__":
         "react_roles": [r.strip() for r in args.react_roles.split(",") if r.strip()],
     }
     
+    init_db()
     logger.info(f"Starting batch run of {args.sessions} sessions.")
     logger.info(f"Config: {json.dumps(config, indent=2)}")
     

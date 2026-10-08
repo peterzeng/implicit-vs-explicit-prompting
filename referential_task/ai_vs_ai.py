@@ -20,6 +20,7 @@ from .prompt_context import (
     _is_acl_prompt_strategy,
     _is_instruction_message,
 )
+from .ai_providers import pop_last_usage
 from .react import react_enabled, react_max_steps, react_step_model_config, run_react_loop
 from .sequence import _update_ai_partial_sequence
 from .visual_context import _inject_round_feedback_context, _inject_visual_grid_context
@@ -875,6 +876,8 @@ def generate_ai_vs_ai_reply(
             )
         )
         
+        final_usage = pop_last_usage()
+
         if text is None:
             logging.warning("[AI_VS_AI] API call returned None for %s", role)
             return None
@@ -1002,6 +1005,7 @@ def generate_ai_vs_ai_reply(
                     "raw_text": text,
                     "selection": selection,
                     "react_trace": react_trace,
+                    "usage": final_usage,
                 })
                 player.group.ai_reasoning_log = json.dumps(existing, ensure_ascii=False)
             except Exception:
