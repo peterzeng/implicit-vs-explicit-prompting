@@ -20,6 +20,7 @@ from .prompt_context import (
     _is_acl_prompt_strategy,
     _is_instruction_message,
 )
+from .react import react_enabled, react_max_steps, react_step_model_config, run_react_loop
 from .sequence import _update_ai_partial_sequence
 from .visual_context import _inject_round_feedback_context, _inject_visual_grid_context
 
@@ -820,6 +821,21 @@ def generate_ai_vs_ai_reply(
                     insert_idx += 1
                 chat_messages.insert(insert_idx, {"role": "developer", "content": matcher_instr})
 
+        # ReAct baseline: private investigation steps before the final reply.
+        # The final call below still uses the base strategy's response schema.
+        react_trace = None
+        if react_enabled(player, role):
+            scratchpad, react_trace = run_react_loop(
+                player,
+                role,
+                chat_messages,
+                all_history,
+                react_step_model_config(player, model_config),
+                react_max_steps(player),
+                call_fn=_api_call_with_retry,
+            )
+            chat_messages = chat_messages + scratchpad
+
         if _prompt_context_debug_enabled(player):
             _dump_prompt_context(player, role, chat_messages)
 
@@ -984,7 +1000,8 @@ def generate_ai_vs_ai_reply(
                     "common_ground": common_ground_obj,
                     "utterance": utterance,
                     "raw_text": text,
-                    "selection": selection
+                    "selection": selection,
+                    "react_trace": react_trace,
                 })
                 player.group.ai_reasoning_log = json.dumps(existing, ensure_ascii=False)
             except Exception:

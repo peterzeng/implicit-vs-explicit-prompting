@@ -136,6 +136,22 @@ Useful options:
 
 Headless runs enable cross-round history by default and export artifacts when all rounds finish.
 
+### ReAct baseline
+
+`--react` layers a ReAct loop (`referential_task/react.py`) on top of either
+prompt strategy. Before each reply, the agent may take private
+thought → action → observation steps: `zoom` (enlarged view of 1–4 baskets),
+`search_history` (keyword search over the dialogue it can already see), or
+`finish`. A final call then produces the strategy's usual structured reply.
+Investigation steps never change the board or reveal correctness; feedback
+still arrives only at the end of a round.
+
+- `--react-max-steps`: step budget per turn (default 4).
+- `--react-step-model`: model for the investigation steps (defaults to each role's model; final replies always use the role's model).
+- `--react-roles`: roles that use ReAct, e.g. `matcher` (default `director,matcher`).
+
+Each step is logged under `react_trace` in the round's `ai_reasoning_log`.
+
 ## Data And Exports
 
 Live state is stored in the `game_sessions` table in `data.sqlite`. Each row is one session-round snapshot with config, grid, target baskets, messages, reasoning logs, matcher sequence, status, and perception fields.

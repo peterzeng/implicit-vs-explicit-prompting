@@ -267,6 +267,28 @@ if __name__ == "__main__":
         action="store_true",
         help="Write per-turn prompt text and attached images under _static/ai_debug/prompt_context/.",
     )
+    parser.add_argument(
+        "--react",
+        action="store_true",
+        help="ReAct baseline: let agents take private zoom/search steps before each reply.",
+    )
+    parser.add_argument(
+        "--react-max-steps",
+        type=int,
+        default=4,
+        help="Maximum ReAct investigation steps per turn.",
+    )
+    parser.add_argument(
+        "--react-step-model",
+        type=str,
+        help="Model for ReAct investigation steps (defaults to each role's model; final replies always use the role's model).",
+    )
+    parser.add_argument(
+        "--react-roles",
+        type=str,
+        default="director,matcher",
+        help="Comma-separated roles that use ReAct (e.g. 'matcher').",
+    )
     
     args = parser.parse_args()
     
@@ -282,6 +304,10 @@ if __name__ == "__main__":
         "ai_director_model": args.director_model or args.model,
         "ai_matcher_model": args.matcher_model or args.model,
         "ai_reasoning_effort": args.reasoning_effort,
+        "react": args.react,
+        "react_max_steps": args.react_max_steps,
+        "react_step_model": args.react_step_model,
+        "react_roles": [r.strip() for r in args.react_roles.split(",") if r.strip()],
     }
     
     logger.info(f"Starting batch run of {args.sessions} sessions.")
