@@ -133,6 +133,10 @@ Useful options:
 - `--basket-set`: selects `referential_task/grids_presetsN.json`.
 - `--cross-round-history` / `--no-cross-round-history`: toggles prior-round text history and submitted-grid feedback images for both agents.
 - `--debug-prompt-context`: writes each model call's text context and attached images under `_static/ai_debug/prompt_context/`.
+- `--stop-after-round N`: stop each session after round N. Prompts still describe a 5-round session, so rounds 1..N are directly comparable to truncated full-length runs such as the paper's 4-round results. Post-task perceptions are skipped; the export still runs.
+- `--db`: SQLite file for live state (default `data.sqlite`). Give parallel batches separate files.
+
+Session IDs include the process ID, so parallel batches with the same `--session-prefix` don't collide.
 
 Headless runs enable cross-round history by default and export artifacts when all rounds finish.
 

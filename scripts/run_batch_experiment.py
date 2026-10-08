@@ -222,7 +222,8 @@ def run_single_session(session_id: str, config: dict):
             logger.info(f"Session {session_id} - Round {round_number} complete.")
             
             total_rounds = get_total_rounds(session)
-            if round_number < total_rounds:
+            last_round = min(total_rounds, config.get("stop_after_round") or total_rounds)
+            if round_number < last_round:
                 round_number += 1
                 new_group = Group()
                 new_grid = get_preset_grid(
@@ -235,24 +236,33 @@ def run_single_session(session_id: str, config: dict):
                 save_state_to_db(session_id, player)
             else:
                 # Final round complete: End of session
-                logger.info(f"Session {session_id} - All {total_rounds} rounds complete. Generating perceptions...")
-                if not getattr(player, "perceptions_generated", False):
-                    player.perceptions_generated = True
-                    generate_ai_vs_ai_perceptions(player)
-                    save_state_to_db(session_id, player)
-                    
-                    # Manual auto-export (similar to main.py logic)
-                    try:
-                        export_session_from_db(
-                            DB_FILE,
-                            session_id,
-                            config,
-                            generate_artifacts=True,
-                            logger=logger,
-                        )
-                    except Exception as export_e:
-                        logger.error(f"Auto-export failed: {export_e}")
-                
+                if round_number == total_rounds:
+                    logger.info(f"Session {session_id} - All {total_rounds} rounds complete. Generating perceptions...")
+                    if not getattr(player, "perceptions_generated", False):
+                        player.perceptions_generated = True
+                        generate_ai_vs_ai_perceptions(player)
+                        save_state_to_db(session_id, player)
+                else:
+                    # Stopped early: prompts still describe the full session, so
+                    # rounds 1..N match truncated full-length runs. The post-task
+                    # perception questions assume a finished session; skip them.
+                    logger.info(
+                        f"Session {session_id} - Stopping after round {round_number} of {total_rounds} "
+                        "(--stop-after-round); skipping post-task perceptions."
+                    )
+
+                # Manual auto-export (similar to main.py logic)
+                try:
+                    export_session_from_db(
+                        DB_FILE,
+                        session_id,
+                        config,
+                        generate_artifacts=True,
+                        logger=logger,
+                    )
+                except Exception as export_e:
+                    logger.error(f"Auto-export failed: {export_e}")
+
                 # Session completely finished
                 break
                 
@@ -273,6 +283,20 @@ if __name__ == "__main__":
     parser.add_argument("--matcher-model", type=str, help="Specific model for matcher (overrides --model).")
     parser.add_argument("--session-prefix", type=str, default="batch", help="Prefix for the session ID.")
     parser.add_argument("--basket-set", type=int, default=5, help="Basket set to use.")
+    parser.add_argument(
+        "--stop-after-round",
+        type=int,
+        help=(
+            f"Stop each session after this round. Prompts still describe a {Constants.num_rounds}-round "
+            "session, so rounds 1..N match truncated full-length runs (e.g. the paper's 4-round results)."
+        ),
+    )
+    parser.add_argument(
+        "--db",
+        type=str,
+        default=DB_FILE,
+        help="SQLite file for live state. Give parallel batches separate files to avoid write contention.",
+    )
     parser.add_argument(
         "--reasoning-effort",
         type=str,
@@ -332,15 +356,19 @@ if __name__ == "__main__":
         "react_max_steps": args.react_max_steps,
         "react_step_model": args.react_step_model,
         "react_roles": [r.strip() for r in args.react_roles.split(",") if r.strip()],
+        "stop_after_round": args.stop_after_round,
     }
-    
+
+    DB_FILE = args.db
     init_db()
     logger.info(f"Starting batch run of {args.sessions} sessions.")
     logger.info(f"Config: {json.dumps(config, indent=2)}")
     
+    # The process ID keeps session IDs unique when several batches with the same
+    # prefix start in the same second.
     timestamp = datetime.now().strftime("%H%M%S")
     for i in range(1, args.sessions + 1):
-        session_id = f"{args.session_prefix}_{timestamp}_{i}"
+        session_id = f"{args.session_prefix}_{timestamp}_{os.getpid()}_{i}"
         run_single_session(session_id, config)
         
     logger.info("Batch run complete!")
