@@ -230,3 +230,34 @@ python scripts/audit_move_attempts.py ~/Documents/dev/lvlms-referential-game/dat
 python scripts/audit_move_attempts.py data/runs/gpt6-luna-cameron/worker*_20261009-15*.sqlite \
   data/runs/gpt6-luna-acl/worker*_20261009-153700.sqlite
 ```
+
+### GPT-5.2 and GPT-5.5 under version 3
+
+To check whether the new rules change GPT-5.x's results, and to compare
+models under identical rules: 2 sessions per prompt for each model
+(2026-10-14, same settings, about $16 in total).
+
+| Model | Prompt | Sessions | Mean accuracy by round (%) | Director words/turn |
+|---|---|---|---|---|
+| GPT-5.2 | Explicit | 2 | 100 / 100 / 100 / 100 / 100 | 13 |
+| GPT-5.2 | Implicit | 2 | 100 / 100 / 96 / 92 / 92 | 43 |
+| GPT-5.5 | Explicit | 2 | 96 / 96 / 100 / 100 / 100 | 4 |
+| GPT-5.5 | Implicit | 2 | 100 / 100 / 100 / 100 / 100 | 28 |
+| gpt-6-luna | Explicit | 3 | 75 / 61 / 78 / 75 / 84 | 8 |
+| gpt-6-luna | Implicit | 3 | 100 / 100 / 100 / 100 / 95 | 32 |
+
+- **Version 3 does not change GPT-5.x's results.** Both score 92–100%, in
+  line with the paper. None of their rounds triggered a move, an
+  ignored-selection note, a refused-submit note, or the cap; the longest round
+  was 32 turns.
+- **gpt-6-luna's explicit-prompt drop is not caused by the rules.** It is a
+  combination of model and prompt: gpt-6-luna is near ceiling with the
+  implicit prompt and about 20 points lower with the explicit one.
+- **Director brevity alone does not explain it.** GPT-5.5's explicit-prompt
+  directors are terser than gpt-6-luna's (4 vs 8 words per turn) and GPT-5.5
+  still scores ~100%. Two explanations remain: gpt-6-luna's matcher handles
+  short descriptions worse, or it benefits from the implicit prompt's
+  required reasoning fields (likely confusions and a question to tell them
+  apart). Mixed-model pairs (gpt-6-luna director with a GPT-5.5 matcher and
+  vice versa) would tell whether the director or the matcher is the weak link.
+- Sample sizes are small (2–3 sessions per condition).
