@@ -296,3 +296,70 @@ gpt-5.6-luna explicit sessions by round: 75/75/75/58/67, 67/58/67/75/75,
   The mixed-model pairs described above would test that directly.
 - **No round hit the turn cap** (longest 44 turns). gpt-5.6-luna made 1 move
   with `move: true`, and gpt-6-sol none.
+
+### Referring-expression analysis (version 3, all models)
+
+2026-10-14. gpt-6-luna and gpt-5.6-luna topped up to 10 sessions per prompt.
+GPT-5.2 and GPT-5.5 have 2 sessions per prompt and gpt-6-sol has 3, so
+treat their numbers as indicative.
+
+**Extractor.** The paper extracted referring expressions with GPT-5.5,
+the newest model at the time. From here on we use **gpt-6-sol**, which costs
+less ($2/$10 vs $5/$30 per 1M tokens). Every condition must use the same
+extractor, so the paper's 40 sessions were re-extracted with gpt-6-sol too.
+Agreement with GPT-5.5, on expressions present in both extractions:
+
+| Sessions | Expressions | Identical | Word overlap (multiset Jaccard) | Words per expression, GPT-5.5 vs gpt-6-sol | Round-level RE-word correlation |
+|---|---|---|---|---|---|
+| Version 3 | 3,240 | 62% | 0.95 | 18.9 vs 17.3 | 0.97 |
+| Paper (version 1, the paper's own extraction) | 2,400 | 61% | 0.93 | 21.6 vs 18.6 | 0.96 |
+
+Most differences are punctuation, or gpt-6-sol leaving out a repeated clause.
+gpt-6-sol's expressions are 10–15% shorter, so absolute RE-word counts are
+lower than the paper's, but round-to-round patterns are the same.
+(`scripts/compare_referring_expressions.py` reports wrong totals when the two
+files cover different sessions, because it scores unmatched rows; the numbers
+above use matched rows only.)
+
+**Results** (gpt-6-sol extraction; RE words are summed over the 12 baskets):
+
+| Model | Prompt | Sessions | Accuracy | RE words, round 1 → 5 | Change (95% CI) |
+|---|---|---|---|---|---|
+| GPT-5.2 | Implicit | 2 | 96% | 537 → 415 | −23% (±1) |
+| GPT-5.2 | Explicit | 2 | 100% | 199 → 115 | −43% (±1) |
+| GPT-5.5 | Implicit | 2 | 100% | 336 → 304 | −9% (±5) |
+| GPT-5.5 | Explicit | 2 | 98% | 75 → 39 | −47% (±14) |
+| gpt-6-sol | Implicit | 3 | 100% | 324 → 280 | −13% (±5) |
+| gpt-6-sol | Explicit | 3 | 97% | 103 → 58 | −44% (±4) |
+| gpt-5.6-luna | Implicit | 10 | 92% | 351 → 300 | −13% (±8) |
+| gpt-5.6-luna | Explicit | 10 | 68% | 94 → 72 | −21% (±9) |
+| gpt-6-luna | Implicit | 10 | 94% | 344 → 302 | −11% (±9) |
+| gpt-6-luna | Explicit | 10 | 77% | 116 → 111 | −4% (±6) |
+
+- **Mid- and top-tier models reproduce the paper's finding.** Under the
+  explicit prompt their referring expressions shorten by 43–47% from round 1
+  to round 5. Under the implicit prompt they shorten much less (9–23%).
+- **Budget models compress less under the explicit prompt, not more.**
+  gpt-6-luna barely shortens (−4%) and gpt-5.6-luna shortens by about half as
+  much as the larger models. They don't trade accuracy for brevity: under the
+  explicit prompt they have both lower accuracy and less compression. Both
+  start short in round 1 (94–116 words), as the explicit prompt asks, but
+  don't shorten further.
+- **With 10 sessions, budget-model implicit accuracy is 92–94%**, slightly
+  below the 97–99% seen with 3 sessions, and below the larger models' 96–100%.
+- **No round hit the turn cap.** The longest was 44 turns.
+- Plots: `figures/v3_models_sol/` (version-3 sessions only; the paper's runs
+  are kept out, since pooling would mix harness versions).
+
+Reproduce:
+
+```bash
+# traces: every complete harness_version 3 session, plus the paper's 40
+cd scripts && python3 warm_gpt_re_cache.py <traces> --cache-dir ../data/metrics_all_sol/gpt_re_cache \
+  --gpt-model gpt-6-sol --workers 16 && cd ..
+python3 scripts/analyze_metrics.py <traces> --extractor gpt --gpt-model gpt-6-sol \
+  --gpt-cache-dir data/metrics_all_sol/gpt_re_cache --output-dir data/metrics_all_sol
+# filter metrics_by_session_round.csv to harness_version == 3, then:
+python3 scripts/plot_acl_style_metrics.py --metrics-dir data/metrics_all_sol/v3_only \
+  --output-dir figures/v3_models_sol --models gpt-5.2 gpt-5.5 gpt-6-sol gpt-5.6-luna gpt-6-luna
+```

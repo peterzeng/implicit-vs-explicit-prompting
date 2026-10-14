@@ -208,6 +208,8 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> None:
+    # Show progress immediately when stdout is redirected to a log file.
+    sys.stdout.reconfigure(line_buffering=True)
     args = parse_args()
     sys.path.insert(0, str(REPO_ROOT))
     from referential_task.state import Constants

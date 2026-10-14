@@ -198,8 +198,18 @@ def plot_figure_subset(
 
     handles, labels = axes[0].get_legend_handles_labels()
     # One row for the paper's four conditions; otherwise one row per prompt.
-    ncol = 4 if len(labels) <= 4 else math.ceil(len(labels) / len(PROMPTS))
-    fig.legend(handles, labels, loc="lower center", ncol=ncol, frameon=False, bbox_to_anchor=(0.5, -0.15))
+    # Legends fill column by column, so interleave the prompts to get rows.
+    if len(labels) <= 4:
+        ncol, fontsize = 4, None
+    else:
+        ncol = math.ceil(len(labels) / len(PROMPTS))
+        order = [p * ncol + i for i in range(ncol) for p in range(len(PROMPTS)) if p * ncol + i < len(labels)]
+        handles, labels = [handles[i] for i in order], [labels[i] for i in order]
+        fontsize = 10
+    fig.legend(
+        handles, labels, loc="lower center", ncol=ncol, frameon=False,
+        bbox_to_anchor=(0.5, -0.15), fontsize=fontsize,
+    )
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(output_path.with_suffix(".png"), dpi=300, bbox_inches="tight")
