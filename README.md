@@ -37,6 +37,46 @@ chronological order, the current round's grid is injected last, and the
 matcher's 12-slot sequence state and candidate pool are rendered into a single
 composite image. Section 3.1 of the paper describes the correction.
 
+## Changes Since The Paper
+
+The `main` branch is the code as published. Later branches improve the game
+rules for how the matcher moves baskets and submits. Each run records the
+rules it used as `harness_version` in its config: absent or 1 for the paper,
+3 for current. Don't pool results across versions.
+[`docs/harness_changes.md`](docs/harness_changes.md) has the full record:
+what failed, the evidence, and the alternatives we rejected.
+
+**Why.** Re-running the paper's design with gpt-6-luna, 3 of 4 explicit-prompt
+sessions got stuck in rounds that could never end. Under the paper's rules, a
+basket that is already placed could only be moved if the matcher's chat
+message contained a word like "move". Incomplete boards could not be
+submitted, and neither refusal was reported to the matcher. gpt-6-luna chose
+the right moves in its structured output (97 of 99 blocked moves targeted
+the correct slot) but didn't use the keywords. A replay of all 200 rounds in
+the paper's runs found no effect on the published results: GPT-5.x never
+completed a move.
+
+**What changed (version 3).**
+
+- **Moves are an explicit field.** `selection.move: true` moves a placed
+  basket. The decision comes from the structured output, not from the
+  wording of a chat message.
+- **Failed actions are reported to the matcher.** If a selection is ignored or
+  a submit is refused, the matcher's private board-state note says so and
+  why. This is the text equivalent of the human interface, where the submit
+  button only appears once all 12 slots are filled.
+- **The board-state note comes last** in the matcher's context, after the
+  director's latest message, instead of above the whole conversation.
+- **Turn cap.** A round ends after 120 turns (`--max-turns-per-round`; the
+  paper's longest round was 46). The board is scored as it stands and the
+  round is flagged `turn_cap_reached`.
+- **Logging.** Each selection's and submit's outcome is logged
+  (`selection_result`, `submit_result` in `ai_reasoning_log`).
+  `scripts/audit_move_attempts.py` replays matcher selections to count move
+  attempts in any runs, including the paper's.
+
+Incomplete submits are still refused, as in the human interface.
+
 ## Licensing
 
 Code is MIT licensed (see `LICENSE`). The data in `data/` is intended to be
@@ -108,6 +148,29 @@ Open `http://127.0.0.1:8000/`, choose the prompt strategy, basket set, models, a
 
 The dashboard writes each round to `data.sqlite` as it runs. When the final round completes, the app also generates post-task perceptions and auto-exports the session artifacts.
 
+## Run The Paper's Design With A New Model
+
+`scripts/run_replication.py` runs both prompt conditions with the paper's
+settings: basket set 5, 5 rounds, cross-round history on, reasoning effort
+`none`, the same model as director and matcher, and 10 sessions per condition.
+It uses the current game rules (see [Changes Since The Paper](#changes-since-the-paper)),
+and only counts sessions run under them.
+
+```bash
+python scripts/run_replication.py --model gpt-6-luna --dry-run
+mkdir -p logs
+nohup caffeinate -i python scripts/run_replication.py --model gpt-6-luna \
+  --baseline-metrics "$HOME/Documents/dev/lvlms-referential-game/data/(ACTUAL LATEST EMNLP)metrics_gpt55_latest_all_rounds_reorganized_fixed_identity" \
+  > logs/gpt6-luna.log 2>&1 &
+```
+
+- Sessions are saved under the prefixes `gpt6-luna-acl` and `gpt6-luna-cameron`, matching the paper's `gpt5.5-acl` naming.
+- Runs are resumable: re-running the same command counts the complete exports and only runs the missing sessions. Stalled sessions are topped up automatically (`--max-passes`).
+- `--workers` sets the number of parallel sessions per condition (default 2). Each worker has its own SQLite file and log under `data/runs/<prefix>/`.
+- At the end, the script prints token totals, then runs `analyze_metrics.py` with GPT-5.5 referring-expression extraction (as in the paper) and plots to `figures/replication_<model>/`.
+- `--baseline-metrics` adds the paper's GPT-5.2/5.5 rows from their existing metrics CSV instead of re-extracting them, so the baseline numbers stay as published. Those runs used the paper's rules, so treat the overlay as a rough reference, not a controlled comparison.
+- `--max-turns-per-round` sets the turn cap (default 120).
+
 ## Run Headless Batches
 
 Use `scripts/run_batch_experiment.py` for repeatable command-line experiments:
@@ -118,7 +181,7 @@ conda run -n langviscog python scripts/run_batch_experiment.py \
   --session-prefix gpt55-acl \
   --prompt-strategy ACL_prompt \
   --model gpt-5.5 \
-  --reasoning-effort low \
+  --reasoning-effort none \
   --basket-set 5
 ```
 
@@ -128,13 +191,14 @@ Useful options:
 - `--prompt-strategy`: `ACL_prompt` or `cameron-prompt`.
 - `--model`: model for both agents.
 - `--director-model` and `--matcher-model`: override the shared model per role.
-- `--reasoning-effort`: `none`, `minimal`, `low`, `medium`, or `high` for GPT-5-family models.
+- `--reasoning-effort`: `none` (the paper's setting), `minimal`, `low`, `medium`, `high`, or `xhigh` for GPT-5/GPT-6 models. Not every model accepts every value (gpt-6-luna rejects `minimal`).
 - `--session-prefix`: prefix used in session IDs and export folders.
 - `--basket-set`: selects `referential_task/grids_presetsN.json`.
 - `--cross-round-history` / `--no-cross-round-history`: toggles prior-round text history and submitted-grid feedback images for both agents.
 - `--debug-prompt-context`: writes each model call's text context and attached images under `_static/ai_debug/prompt_context/`.
 - `--stop-after-round N`: stop each session after round N. Prompts still describe a 5-round session, so rounds 1..N are directly comparable to truncated full-length runs such as the paper's 4-round results. Post-task perceptions are skipped; the export still runs.
 - `--db`: SQLite file for live state (default `data.sqlite`). Give parallel batches separate files.
+- `--max-turns-per-round`: end a round after this many turns and score the board as it stands (default 120, `0` disables).
 
 Session IDs include the process ID, so parallel batches with the same `--session-prefix` don't collide.
 

@@ -424,6 +424,8 @@ def analyze_trace(
                 "round": round_num,
                 "accuracy": float(status.get("accuracy", 0.0) or 0.0),
                 "turns": int(status.get("turn_count", len(messages)) or 0),
+                "turn_cap_reached": bool(status.get("turn_cap_reached")),
+                "harness_version": first_config.get("harness_version", 1),
                 "words": sum(get_content_word_count(m.get("text", "")) for m in messages),
                 "re_words": total_re_len,
                 "mean_re_length": total_re_len / 12,
@@ -456,6 +458,7 @@ def summarize(rows: list[dict[str, Any]], group_fields: list[str]) -> list[dict[
         "relative_lexical_overlap",
         "jaccard_lexical_overlap",
         "extracted_objects",
+        "turn_cap_reached",
     ]
     grouped: dict[tuple[Any, ...], list[dict[str, Any]]] = {}
     for row in rows:
@@ -631,6 +634,7 @@ def main() -> None:
             "prompt_strategy",
             "director_model",
             "matcher_model",
+            "harness_version",
             "round",
         ],
     )
@@ -644,6 +648,7 @@ def main() -> None:
             "prompt_strategy",
             "director_model",
             "matcher_model",
+            "harness_version",
         ],
     )
     collapsed_round_summary = summarize(
@@ -655,6 +660,7 @@ def main() -> None:
             "prompt_strategy",
             "director_model",
             "matcher_model",
+            "harness_version",
             "round",
         ],
     )
@@ -667,6 +673,7 @@ def main() -> None:
             "prompt_strategy",
             "director_model",
             "matcher_model",
+            "harness_version",
         ],
     )
 

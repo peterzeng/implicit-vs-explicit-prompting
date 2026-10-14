@@ -20,7 +20,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from referential_task.state import Player, Group, Session
 from referential_task.state import Constants
-from referential_task.ai_vs_ai import get_ai_vs_ai_status, run_ai_vs_ai_turn
+from referential_task.ai_vs_ai import HARNESS_VERSION, get_ai_vs_ai_status, run_ai_vs_ai_turn
 from referential_task.exporting import export_session_from_db, load_session_export_data
 from referential_task.visual_context import _load_matcher_pool_image_urls
 
@@ -228,6 +228,7 @@ async def start_game(data: dict):
         "ai_director_model": data.get("director_model") or os.environ.get("AI_DIRECTOR_MODEL", "gpt-4o-mini"),
         "ai_matcher_model": data.get("matcher_model") or os.environ.get("AI_MATCHER_MODEL", "gpt-4o-mini"),
         "ai_reasoning_effort": data.get("reasoning_effort", "none"),
+        "harness_version": HARNESS_VERSION,
     }
     session = Session(session_config)
     

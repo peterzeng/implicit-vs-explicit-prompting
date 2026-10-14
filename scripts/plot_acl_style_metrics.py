@@ -28,34 +28,40 @@ METRICS = [
     ("relative_lexical_overlap", "Proportion of Lexical Overlap\n(Lexical Entrainment)"),
 ]
 
-CONDITION_ORDER = [
-    ("ACL", "ACL_prompt", "gpt-5.2", "Implicit Prompt, GPT-5.2"),
-    ("ACL", "ACL_prompt", "gpt-5.5", "Implicit Prompt, GPT-5.5"),
-    ("Cameron", "cameron-prompt", "gpt-5.2", "Explicit Prompt, GPT-5.2"),
-    ("Cameron", "cameron-prompt", "gpt-5.5", "Explicit Prompt, GPT-5.5"),
+PAPER_MODELS = ["gpt-5.2", "gpt-5.5"]
+
+PROMPTS = [
+    ("ACL", "ACL_prompt", "Implicit Prompt", ":"),
+    ("Cameron", "cameron-prompt", "Explicit Prompt", "-"),
 ]
 
-COLORS = {
-    "Implicit Prompt, GPT-5.2": "tab:blue",
-    "Implicit Prompt, GPT-5.5": "tab:orange",
-    "Explicit Prompt, GPT-5.2": "tab:blue",
-    "Explicit Prompt, GPT-5.5": "tab:orange",
-}
+MODEL_COLORS = ["tab:blue", "tab:orange", "tab:green", "tab:red", "tab:purple"]
+MODEL_MARKERS = ["o", "^", "s", "D", "v"]
 
-MARKERS = {
-    "Implicit Prompt, GPT-5.2": "o",
-    "Implicit Prompt, GPT-5.5": "^",
-    "Explicit Prompt, GPT-5.2": "o",
-    "Explicit Prompt, GPT-5.5": "^",
-}
+# Filled in by configure_conditions() from --models.
+CONDITION_ORDER: list[tuple[str, str, str, str]] = []
+COLORS: dict[str, str] = {}
+MARKERS: dict[str, str] = {}
+LINESTYLES: dict[str, str] = {}
 
-LINESTYLES = {
-    "Implicit Prompt, GPT-5.2": ":",
-    "Implicit Prompt, GPT-5.5": ":",
-    "Explicit Prompt, GPT-5.2": "-",
-    "Explicit Prompt, GPT-5.5": "-",
-}
 
+def model_display_name(model: str) -> str:
+    """gpt-5.5 -> GPT-5.5, gpt-6-luna -> GPT-6 Luna."""
+    family, _, variant = model.partition("-")
+    version, _, suffix = variant.partition("-")
+    name = f"{family.upper()}-{version}" if version else family.upper()
+    return f"{name} {suffix.replace('-', ' ').title()}" if suffix else name
+
+
+def configure_conditions(models: list[str]) -> None:
+    CONDITION_ORDER.clear()
+    for experiment, prompt, prompt_label, linestyle in PROMPTS:
+        for idx, model in enumerate(models):
+            label = f"{prompt_label}, {model_display_name(model)}"
+            CONDITION_ORDER.append((experiment, prompt, model, label))
+            COLORS[label] = MODEL_COLORS[idx % len(MODEL_COLORS)]
+            MARKERS[label] = MODEL_MARKERS[idx % len(MODEL_MARKERS)]
+            LINESTYLES[label] = linestyle
 
 
 def ci95(values: list[float]) -> float:
@@ -191,7 +197,9 @@ def plot_figure_subset(
             ax.spines[spine].set_visible(False)
 
     handles, labels = axes[0].get_legend_handles_labels()
-    fig.legend(handles, labels, loc="lower center", ncol=4, frameon=False, bbox_to_anchor=(0.5, -0.15))
+    # One row for the paper's four conditions; otherwise one row per prompt.
+    ncol = 4 if len(labels) <= 4 else math.ceil(len(labels) / len(PROMPTS))
+    fig.legend(handles, labels, loc="lower center", ncol=ncol, frameon=False, bbox_to_anchor=(0.5, -0.15))
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(output_path.with_suffix(".png"), dpi=300, bbox_inches="tight")
@@ -232,11 +240,18 @@ def parse_args() -> argparse.Namespace:
         default=[],
         help="Exclude rows whose session_prefix contains this substring. Repeatable.",
     )
+    parser.add_argument(
+        "--models",
+        nargs="+",
+        default=PAPER_MODELS,
+        help="Models to plot, in legend order (default: the paper's GPT-5.2 and GPT-5.5).",
+    )
     return parser.parse_args()
 
 
 def main() -> None:
     args = parse_args()
+    configure_conditions(args.models)
     metrics_csv = args.metrics_dir / "metrics_by_session_round.csv"
     df = pd.read_csv(metrics_csv)
     for pattern in args.exclude_session_prefix:

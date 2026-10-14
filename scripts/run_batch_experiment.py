@@ -1,4 +1,4 @@
-#!/usr/风/env python3
+#!/usr/bin/env python3
 import sys
 import os
 import argparse
@@ -13,16 +13,18 @@ load_dotenv()
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from referential_task.state import Player, Group, Session, Constants
-from referential_task.ai_vs_ai import run_ai_vs_ai_turn
+from referential_task.ai_vs_ai import DEFAULT_MAX_TURNS_PER_ROUND, HARNESS_VERSION, run_ai_vs_ai_turn
 from referential_task.exporting import export_session_from_db
 from referential_task.ai_perceptions import generate_ai_vs_ai_perceptions
 
 import sqlite3
 import random
+import time
 from pathlib import Path
 from referential_task.ai_vs_ai import get_ai_vs_ai_status
 
 DB_FILE = "data.sqlite"
+STALL_BACKOFF_SECONDS = 15
 
 def init_db():
     """Create the game_sessions table if needed (same schema as main.py)."""
@@ -209,6 +211,9 @@ def run_single_session(session_id: str, config: dict):
                 if failed_turns > 5:
                     logger.error(f"Session {session_id} stalled. Status hasn't changed for 5 turns. Breaking loop to prevent infinite retry. Please check API keys.")
                     break
+                # A turn that made no progress usually means the API call failed;
+                # wait before retrying so transient outages can clear.
+                time.sleep(STALL_BACKOFF_SECONDS * failed_turns)
             else:
                 failed_turns = 0
                 last_status = current_status
@@ -292,6 +297,12 @@ if __name__ == "__main__":
         ),
     )
     parser.add_argument(
+        "--max-turns-per-round",
+        type=int,
+        default=DEFAULT_MAX_TURNS_PER_ROUND,
+        help="End a round after this many turns, scoring the board as-is (0 disables the cap).",
+    )
+    parser.add_argument(
         "--db",
         type=str,
         default=DB_FILE,
@@ -301,8 +312,8 @@ if __name__ == "__main__":
         "--reasoning-effort",
         type=str,
         default="none",
-        choices=["none", "minimal", "low", "medium", "high"],
-        help="Reasoning effort for GPT-5 family models.",
+        choices=["none", "minimal", "low", "medium", "high", "xhigh"],
+        help="Reasoning effort for GPT-5/GPT-6 family models (the paper used none).",
     )
     parser.add_argument(
         "--cross-round-history",
@@ -357,6 +368,8 @@ if __name__ == "__main__":
         "react_step_model": args.react_step_model,
         "react_roles": [r.strip() for r in args.react_roles.split(",") if r.strip()],
         "stop_after_round": args.stop_after_round,
+        "max_turns_per_round": args.max_turns_per_round,
+        "harness_version": HARNESS_VERSION,
     }
 
     DB_FILE = args.db

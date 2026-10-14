@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import datetime
 import json
+import logging
 import os
 import random
 from typing import Any
@@ -26,67 +27,25 @@ from .sequence import _update_ai_partial_sequence
 from .visual_context import _inject_round_feedback_context, _inject_visual_grid_context
 
 
-# Models that support the reasoning_effort parameter.
-GPT_5_2_MODELS = frozenset({
-    "gpt-5",
-    "gpt-5.2",
-    "gpt-5.2-mini",
-    "gpt-5.2-chat-latest",
-    "gpt-5.2-pro",
-    "gpt-5.4",
-    "gpt-5.4-mini",
-    "gpt-5.5",
-})
+# Model capability checks live in ai_providers so both call paths agree.
+from .ai_providers import (  # noqa: E402
+    GPT_5_2_MODELS,
+    is_gpt_5_2_model as _is_gpt_5_2_model,
+    reasoning_effort_for_api as _reasoning_effort_for_api,
+    uses_max_completion_tokens as _uses_max_completion_tokens,
+)
 
+# Bumped when the game rules change in a way that affects results.
+#   1 (absent): EMNLP 2026 paper. Moves gated on keywords in the utterance.
+#   2: interim development version (2 test sessions, 2026-10-09): moves use
+#      selection.move, rejected selections are reported, turn cap.
+#   3: version 2, plus refused submits are reported and the matcher's
+#      board-state note is the last message in its context.
+# See docs/harness_changes.md.
+HARNESS_VERSION = 3
 
-def _is_gpt_5_2_model(model: str) -> bool:
-    """Check if a model supports GPT-5.x API features (reasoning_effort).
-    
-    Returns True for GPT-5, GPT-5.2, GPT-5.4, GPT-5.5, and GPT-5 snapshots that
-    support the reasoning_effort parameter.
-    """
-    if not model:
-        return False
-    # Exact match in known set
-    if model in GPT_5_2_MODELS:
-        return True
-    # Pattern match for GPT-5 snapshots plus supported GPT-5.x variants.
-    model_lower = model.lower()
-    return (
-        model_lower == "gpt-5"
-        or model_lower.startswith("gpt-5-")
-        or model_lower.startswith("gpt-5.2")
-        or model_lower.startswith("gpt-5.4")
-        or model_lower.startswith("gpt-5.5")
-    )
-
-
-def _reasoning_effort_for_api(model: str, reasoning_effort: str | None) -> str | None:
-    """Return a reasoning_effort value that is valid to send for a model."""
-    if not _is_gpt_5_2_model(model):
-        return None
-    effort = reasoning_effort or "none"
-    model_lower = model.lower() if model else ""
-    if effort == "none" and (model_lower == "gpt-5" or model_lower.startswith("gpt-5-")):
-        return None
-    return effort
-
-
-def _uses_max_completion_tokens(model: str) -> bool:
-    """Check if a model requires max_completion_tokens instead of max_tokens.
-    
-    OpenAI's o1, o3, and gpt-5.x series models use max_completion_tokens.
-    """
-    if not model:
-        return False
-    model_lower = model.lower()
-    # o1, o3 series models
-    if model_lower.startswith(("o1", "o3")):
-        return True
-    # GPT-5.x series models
-    if model_lower.startswith("gpt-5"):
-        return True
-    return False
+# The paper's longest round was 46 turns; typical rounds take 26-35.
+DEFAULT_MAX_TURNS_PER_ROUND = 120
 
 
 def _coerce_ready_to_submit(value: Any) -> bool:
@@ -127,30 +86,6 @@ def _clean_ai_utterance(value: Any) -> str | None:
     if not utterance or utterance.lower() in {"null", "none"}:
         return None
     return utterance
-
-
-def _utterance_explicitly_moves_selection(utterance: str | None) -> bool:
-    """Return True when the matcher explicitly says it is correcting by moving."""
-    if not utterance:
-        return False
-    text = utterance.lower()
-    move_markers = (
-        "move",
-        "moving",
-        "moved",
-        "swap",
-        "swapping",
-        "replace",
-        "replacing",
-        "correction",
-        "correcting",
-        "wrong position",
-        "from position",
-        "from slot",
-        "instead of position",
-        "instead of slot",
-    )
-    return any(marker in text for marker in move_markers)
 
 
 def _get_ai_model(player: Player | None = None, ai_role: str | None = None) -> str:
@@ -694,7 +629,7 @@ def generate_ai_vs_ai_reply(
                 lines = [
                     "=== CURRENT BOARD STATE ===",
                     f"ALREADY FILLED ({len(filled_positions)}/12): {filled_str}",
-                    f"  → Do NOT select a candidate that is already filled in a different position unless you explicitly say you are correcting/moving it.",
+                    f"  → Do NOT select a candidate that is already filled in a different position unless you are deliberately moving it (set `move` to true in your selection).",
                     # f"  → Do NOT say 'Go to Basket X' for any position in the ALREADY FILLED list.",
                     f"STILL EMPTY ({len(empty_positions)}/12 remaining): {empty_str}",
                 ]
@@ -726,7 +661,7 @@ def generate_ai_vs_ai_reply(
                     lines.append(f"USED CANDIDATES: {used_str}")
                     if empty_positions:
                         lines.append(
-                            "For the next empty position, pick a candidate NOT in USED CANDIDATES unless you are intentionally correcting a previous slot."
+                            "For the next empty position, pick a candidate NOT in USED CANDIDATES unless you are intentionally correcting a previous slot (set `move` to true)."
                         )
 
                 if pending_refills:
@@ -739,20 +674,18 @@ def generate_ai_vs_ai_reply(
                         f"  → Do not mention 'hidden state', 'system notices', or internal bookkeeping.",
                     ]
 
+                lines += _action_feedback_notice(player)
+
                 if not empty_positions:
                     lines.append("ALL 12 POSITIONS ARE FILLED — set ready_to_submit to true now.")
 
                 lines.append("===========================")
                 seq_state_text = "\n".join(lines)
 
-                insert_idx = 0
-                while (
-                    insert_idx < len(chat_messages)
-                    and isinstance(chat_messages[insert_idx], dict)
-                    and _is_instruction_message(chat_messages[insert_idx])
-                ):
-                    insert_idx += 1
-                chat_messages.insert(insert_idx, {"role": "developer", "content": seq_state_text})
+                # Last in the context, after the Director's latest message. At
+                # the top it sat above the whole dialogue, and matchers acted
+                # on stale beliefs about the board (docs/harness_changes.md).
+                chat_messages.append({"role": "developer", "content": seq_state_text})
             except Exception:
                 pass
 
@@ -807,7 +740,8 @@ def generate_ai_vs_ai_reply(
                     '  "selection": {\n'
                     '    "candidate_index": <1-18 or null if no selection this turn>,\n'
                     '    "position": <1-12 or null if no selection this turn>,\n'
-                    '    "ready_to_submit": <true ONLY when ALL 12 positions are filled, false otherwise>\n'
+                    '    "ready_to_submit": <true ONLY when ALL 12 positions are filled, false otherwise>,\n'
+                    '    "move": <true ONLY when deliberately moving an already-placed basket to a different position>\n'
                     "  }\n"
                     "}\n\n"
                     "IMPORTANT: If there are empty positions, work on the LOWEST-NUMBERED empty position first. "
@@ -928,6 +862,7 @@ def generate_ai_vs_ai_reply(
                             "candidate_index": cand_int,
                             "position": pos_int,
                             "ready_to_submit": ready,
+                            "move": sel.get("move") is True,
                         }
             except Exception as e:
                 logging.warning("[AI_VS_AI] Failed to parse matcher JSON: %s", e)
@@ -1021,6 +956,132 @@ def generate_ai_vs_ai_reply(
         return None
 
 
+def _max_turns_per_round(player: Player) -> int | None:
+    """Turn cap per round from session config; 0 disables it."""
+    try:
+        value = (player.session.config or {}).get("max_turns_per_round")
+    except Exception:
+        value = None
+    if value is None:
+        return DEFAULT_MAX_TURNS_PER_ROUND
+    return int(value) or None
+
+
+def _candidate_positions(player: Player) -> tuple[dict[int, int], list[dict[str, Any]]]:
+    state = _build_matcher_current_sequence_state_for_prompt(player)
+    slots = state.get("sequence_slots", [])
+    placed = {
+        int(slot["candidate_index"]): int(slot["position"])
+        for slot in slots
+        if isinstance(slot, dict) and slot.get("candidate_index") and slot.get("position")
+    }
+    return placed, slots
+
+
+def _apply_matcher_selection(player: Player, selection: dict[str, Any]) -> dict[str, Any] | None:
+    """Apply the matcher's selection and report whether it took effect.
+
+    A basket that is already placed only moves when the matcher sets
+    `selection.move`. The result is logged and, if the selection was not
+    applied, shown to the matcher on its next turn, so a refused selection
+    cannot repeat silently.
+    """
+    try:
+        candidate = int(selection.get("candidate_index"))
+    except (TypeError, ValueError):
+        return None  # clarification turn; nothing to apply
+    try:
+        requested = int(selection["position"]) if selection.get("position") is not None else None
+    except (TypeError, ValueError):
+        requested = None
+    move = bool(selection.get("move"))
+
+    placed_before, slots_before = _candidate_positions(player)
+    _, vacated = _update_ai_partial_sequence(player, selection, allow_move=move)
+    placed_after, slots_after = _candidate_positions(player)
+
+    now_at = placed_after.get(candidate)
+    if requested is None:
+        applied = now_at is not None and (candidate not in placed_before or slots_after != slots_before)
+    else:
+        applied = now_at == requested
+
+    result: dict[str, Any] = {
+        "candidate_index": candidate,
+        "position": requested,
+        "move": move,
+        "applied": applied,
+    }
+    if vacated is not None:
+        result["vacated_position"] = vacated
+        logging.info("[AI_VS_AI] Matcher moved basket; position %d is now empty", vacated)
+    if not applied:
+        if candidate in placed_before and not move:
+            result.update(reason="already_placed", already_at=placed_before[candidate])
+        else:
+            result["reason"] = "invalid_selection"
+        logging.info("[AI_VS_AI] Matcher selection not applied: %s", result)
+    return result
+
+
+def _record_matcher_outcome(player: Player, key: str, outcome: dict[str, Any]) -> None:
+    """Attach an action outcome (selection or submit) to this turn's matcher log entry."""
+    try:
+        log = json.loads(player.group.ai_reasoning_log or "[]")
+    except Exception:
+        return
+    for entry in reversed(log if isinstance(log, list) else []):
+        if isinstance(entry, dict) and entry.get("ai_role") == "matcher":
+            entry[key] = outcome
+            player.group.ai_reasoning_log = json.dumps(log, ensure_ascii=False)
+            return
+
+
+def _action_feedback_notice(player: Player) -> list[str]:
+    """Board-state lines telling the matcher which of its last actions did not take effect.
+
+    The text counterpart of the human interface, where a placement visibly
+    fails and the submit button stays hidden until all 12 slots are filled.
+    """
+    try:
+        log = json.loads(player.group.ai_reasoning_log or "[]")
+    except Exception:
+        return []
+    last = next(
+        (e for e in reversed(log if isinstance(log, list) else [])
+         if isinstance(e, dict) and e.get("ai_role") == "matcher"),
+        None,
+    ) or {}
+
+    lines: list[str] = []
+    result = last.get("selection_result") or {}
+    if not result.get("applied", True):
+        candidate, position = result.get("candidate_index"), result.get("position")
+        if result.get("reason") == "already_placed":
+            at = result.get("already_at")
+            lines += [
+                f"YOUR LAST SELECTION WAS NOT APPLIED: candidate {candidate} is already in position {at}, "
+                f"so it was not placed in position {position}.",
+                f"  → To move it, set `move` to true in your selection (position {at} will then be empty and need refilling).",
+                "  → Otherwise, choose a candidate that is not in USED CANDIDATES.",
+            ]
+        else:
+            lines.append(
+                f"YOUR LAST SELECTION WAS NOT APPLIED: candidate {candidate} / position {position} is not valid. "
+                "Use a candidate number 1-18 and a position 1-12."
+            )
+
+    submit = last.get("submit_result") or {}
+    if submit.get("accepted") is False:
+        empty = ", ".join(str(p) for p in submit.get("empty_positions", []))
+        lines += [
+            f"YOUR SUBMIT WAS NOT ACCEPTED: position(s) {empty} still empty. "
+            "The sequence can only be submitted once all 12 positions are filled.",
+            "  → Ask the Director to describe the basket for the lowest empty position, then place it.",
+        ]
+    return lines
+
+
 def run_ai_vs_ai_turn(player: Player) -> dict[str, Any]:
     """Execute one turn of AI vs AI dialogue.
 
@@ -1095,19 +1156,11 @@ def run_ai_vs_ai_turn(player: Player) -> dict[str, Any]:
         # If Matcher made a selection, update the partial sequence
         is_complete = False
         if speaker == "matcher" and selection:
-            allow_move = _utterance_explicitly_moves_selection(utterance)
-            _, vacated_position = _update_ai_partial_sequence(
-                player,
-                selection,
-                allow_move=allow_move,
-            )
-            if vacated_position is not None:
-                logging.info(
-                    "[AI_VS_AI] Matcher moved basket — position %d is now vacant",
-                    vacated_position,
-                )
+            selection_result = _apply_matcher_selection(player, selection)
+            if selection_result is not None:
+                _record_matcher_outcome(player, "selection_result", selection_result)
 
-        def _submit_complete_sequence() -> bool:
+        def _submit_complete_sequence(allow_incomplete: bool = False) -> bool:
             nonlocal is_complete
             try:
                 sequence = json.loads(player.group.ai_partial_sequence or "[]")
@@ -1115,16 +1168,22 @@ def run_ai_vs_ai_turn(player: Player) -> dict[str, Any]:
                 filled_count = len(by_pos)
                 missing_positions = [p for p in range(1, 13) if p not in by_pos]
 
-                if missing_positions:
+                if missing_positions and not allow_incomplete:
                     logging.info(
                         "[AI_VS_AI] Ignoring submit intent: %d/12 filled, missing positions: %s",
                         filled_count,
                         missing_positions,
                     )
+                    _record_matcher_outcome(
+                        player, "submit_result", {"accepted": False, "empty_positions": missing_positions}
+                    )
                     return False
 
                 is_complete = True
-                player.group.matcher_sequence = json.dumps([by_pos[p] for p in range(1, 13)])
+                # Empty positions (turn cap only) are left out and score as wrong.
+                player.group.matcher_sequence = json.dumps(
+                    [by_pos[p] for p in range(1, 13) if p in by_pos]
+                )
 
                 try:
                     shared_grid = json.loads(player.group.shared_grid or "[]")
@@ -1138,7 +1197,8 @@ def run_ai_vs_ai_turn(player: Player) -> dict[str, Any]:
                     player.task_completed = True
                     player.completion_time = now_iso
                     logging.info(
-                        "[AI_VS_AI] Submitted complete sequence: 12/12 filled, Accuracy: %.1f%%",
+                        "[AI_VS_AI] Submitted sequence: %d/12 filled, Accuracy: %.1f%%",
+                        filled_count,
                         player.sequence_accuracy,
                     )
                 except Exception as e:
@@ -1171,6 +1231,19 @@ def run_ai_vs_ai_turn(player: Player) -> dict[str, Any]:
             if re.search(combined_pattern, utterance.lower()):
                 logging.info("[AI_VS_AI] Detected submit intent in utterance: %s", utterance[:80])
                 _submit_complete_sequence()
+
+        # Safety net: end a round that runs far past normal length (e.g., the
+        # matcher keeps retrying a selection it cannot make). The board is
+        # scored as-is and the round is flagged in its status.
+        max_turns = _max_turns_per_round(player)
+        if not is_complete and max_turns and turn_number >= max_turns:
+            logging.warning(
+                "[AI_VS_AI] Round %s reached the %d-turn cap; submitting the board as-is",
+                getattr(player, "round_number", "?"),
+                max_turns,
+            )
+            player.turn_cap_reached = True
+            _submit_complete_sequence(allow_incomplete=True)
 
         return {
             "turn_number": turn_number,
@@ -1231,4 +1304,5 @@ def get_ai_vs_ai_status(player: Player) -> dict[str, Any]:
         "filled_count": filled_count,
         "is_complete": task_completed,
         "accuracy": sequence_accuracy,
+        "turn_cap_reached": bool(getattr(player, "turn_cap_reached", False)),
     }

@@ -27,3 +27,4 @@ emnlp_results_section_draft.md
 # Paper artifact: keep the data placeholder tracked, ignore bulk run output
 data/*
 !data/README.md
+logs/

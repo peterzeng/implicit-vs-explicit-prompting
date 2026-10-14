@@ -2,7 +2,7 @@
 Multi-provider AI client infrastructure.
 
 Supports:
-- OpenAI (GPT-5.4, GPT-5.2, GPT-4o, etc.)
+- OpenAI (GPT-6, GPT-5.5, GPT-5.2, GPT-4o, etc.)
 - Google Gemini (gemini-3-pro, gemini-3-flash, gemini-2.5-pro, etc.)
 
 Each role (director/matcher) can use a different provider/model combination.
@@ -34,6 +34,7 @@ GPT_5_2_MODELS = frozenset({
     "gpt-5.4",
     "gpt-5.4-mini",
     "gpt-5.5",
+    "gpt-6-luna",
 })
 
 # Gemini models (for reference)
@@ -87,22 +88,14 @@ def detect_provider_from_model(model: str) -> str:
 def is_gpt_5_2_model(model: str) -> bool:
     """Check if a model supports GPT-5.x API features (reasoning_effort).
     
-    Returns True for GPT-5, GPT-5.2, GPT-5.4, GPT-5.5, and GPT-5 snapshots that
-    support the reasoning_effort parameter.
+    Returns True for the GPT-5 and GPT-6 families (gpt-5, gpt-5.5, gpt-5.6-luna,
+    gpt-6-luna, ...), which take reasoning_effort and reject custom temperatures.
     """
     if not model:
         return False
     if model in GPT_5_2_MODELS:
         return True
-    model_lower = model.lower()
-    # Match GPT-5 snapshots plus GPT-5.x variants that support reasoning_effort.
-    return (
-        model_lower == "gpt-5"
-        or model_lower.startswith("gpt-5-")
-        or model_lower.startswith("gpt-5.2")
-        or model_lower.startswith("gpt-5.4")
-        or model_lower.startswith("gpt-5.5")
-    )
+    return model.lower().startswith(("gpt-5", "gpt-6"))
 
 
 def reasoning_effort_for_api(model: str, reasoning_effort: str | None) -> str | None:
@@ -123,7 +116,7 @@ def uses_max_completion_tokens(model: str) -> bool:
     model_lower = model.lower()
     if model_lower.startswith(("o1", "o3")):
         return True
-    if model_lower.startswith("gpt-5"):
+    if model_lower.startswith(("gpt-5", "gpt-6")):
         return True
     return False
 
@@ -577,8 +570,23 @@ def _call_openai_api(
             )
         return (reply or "").strip()
     except Exception as e:
+        # Let rate limits, timeouts, and 5xx errors reach _api_call_with_retry
+        # so they get backoff instead of failing the turn immediately.
+        if _is_transient_openai_error(e):
+            raise
         logging.error("[AI_PROVIDERS] OpenAI API error: %s: %s", type(e).__name__, e)
         return None
+
+
+def _is_transient_openai_error(error: Exception) -> bool:
+    try:
+        import openai
+    except ImportError:
+        return False
+    return isinstance(
+        error,
+        (openai.RateLimitError, openai.APIConnectionError, openai.InternalServerError),
+    )
 
 
 def _call_gemini_api(

@@ -30,6 +30,9 @@ class ACLSelection(BaseModel):
     ready_to_submit: bool = Field(
         description="True only when the full 12-basket sequence is ready to submit.",
     )
+    move: bool = Field(
+        description="True only when deliberately moving an already-placed basket to a different position.",
+    )
 
 
 class ACLMatcherReasoning(BaseModel):
@@ -137,7 +140,7 @@ def _build_acl_role_prompt(player: Any, ai_role: str) -> str:
         "- Use phrases like 'I think I found it...', 'I'm not sure between two baskets...', or 'Can you clarify...'.\n"
         "- If a repeated description previously led you to choose a basket that was marked incorrect, treat that prior choice as negative evidence and try a different visually plausible basket unless new details clearly justify it.\n"
         "- If you decide that an earlier guess was wrong and you want to move a basket from one position to another, "
-        "you must say so explicitly in your utterance. When you've moved the basket, include in your utterance a request to re-describe the basket for the now-empty earlier position so you can fill it again.\n"
+        "set `selection.move` to true and say so in your utterance. When you've moved the basket, include in your utterance a request to re-describe the basket for the now-empty earlier position so you can fill it again.\n"
         "- Never say you are an AI system; speak as a collaborative game partner.\n"
         "- Focus on the current basket being discussed; avoid drifting to off-topic discussion."
     )
@@ -182,7 +185,8 @@ def build_acl_prompt_messages(
             '  "selection": {\n'
             '    "candidate_index": <integer 1-18 from the numbered candidate tiles, or null if asking for clarification>,\n'
             '    "position": <integer 1-12 for which position this basket goes in, or null for next available>,\n'
-            '    "ready_to_submit": <true only when submitting final 12-basket order, otherwise false>\n'
+            '    "ready_to_submit": <true only when submitting final 12-basket order, otherwise false>,\n'
+            '    "move": <true only when deliberately moving an already-placed basket to a different position, otherwise false>\n'
             "  }\n"
             "}\n\n"
             "Rules:\n"

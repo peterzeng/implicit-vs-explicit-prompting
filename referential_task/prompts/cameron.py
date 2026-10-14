@@ -20,6 +20,7 @@ class Selection(BaseModel):
     candidate_index: Optional[int]
     position: Optional[int]
     ready_to_submit: bool
+    move: bool
 
 class MatcherResponse(BaseModel):
     model_config = {"extra": "forbid"}
@@ -113,6 +114,7 @@ def build_cameron_prompt_messages(
             "- `ready_to_submit` should be true ONLY when submitting final 12-basket order, otherwise false.\n"
             "- If you are asking for clarification (not committing yet), set `candidate_index` to null.\n"
             "- If you DO commit, set `position` to the position you are currently trying to fill (usually the lowest-numbered empty position).\n"
+            "- `move` should be true ONLY when you are deliberately moving a basket that is already placed to a different position. Its old position becomes empty and needs to be filled again. Otherwise set it to false.\n"
             "- If you set `candidate_index`, your `utterance` should state that you placed/are placing the basket in that position, otherwise ask the DIRECTOR to describe the next basket.\n"
             "- Never mention candidate indices, IDs, or filenames in your utterance."
         )
