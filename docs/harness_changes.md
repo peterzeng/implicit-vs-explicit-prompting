@@ -191,7 +191,34 @@ and several images by then).
 
 ## Results under version 3
 
-Pending: 3 sessions per prompt with gpt-6-luna (2026-10-14).
+3 sessions per prompt with gpt-6-luna on 2026-10-14, using the paper's
+settings (reasoning effort `none`, basket set 5, 5 rounds). The 6 sessions ran
+in parallel in about 10 minutes and cost about $0.45.
+
+Accuracy (%) and turns per round:
+
+| Prompt | Session | Accuracy, rounds 1–5 | Turns, rounds 1–5 |
+|---|---|---|---|
+| Implicit | 1 | 100 / 100 / 100 / 100 / 100 | 26 / 28 / 26 / 28 / 28 |
+| Implicit | 2 | 100 / 100 / 100 / 100 / 92 | 28 / 26 / 30 / 26 / 26 |
+| Implicit | 3 | 100 / 100 / 100 / 100 / 92 | 26 / 28 / 26 / 26 / 26 |
+| Explicit | 1 | 50 / 58 / 50 / 58 / 67 | 26 / 24 / 36 / 30 / 26 |
+| Explicit | 2 | 83 / 33 / 83 / 67 / 92 | 28 / 32 / 26 / 26 / 26 |
+| Explicit | 3 | 92 / 92 / 100 / 100 / 92 | 28 / 24 / 26 / 28 / 28 |
+
+- **No round reached the cap.** The longest round was 36 turns, within the
+  paper's range (max 46). Under version 1, 3 of 4 explicit sessions got stuck.
+- **The new feedback was used and worked.** In explicit session 1, the matcher
+  had 2 selections ignored and 1 submit refused; it recovered each time
+  within the round. Explicit session 2 moved baskets twice with `move: true`.
+  The implicit sessions never needed either.
+- **The accuracy gap between prompts is not a harness effect.** Explicit
+  session 1 scored 50–67% in every round without any loop: it placed full
+  boards with wrong baskets. This is gpt-6-luna's performance under the
+  explicit prompt, not something the rules caused.
+- **Caveats.** Three sessions per prompt is a small sample, and the version-3
+  changes were introduced together, so we can't say which one prevented the
+  loops (see open questions).
 
 ## Reproducing the numbers
 
