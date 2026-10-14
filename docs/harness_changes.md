@@ -261,3 +261,38 @@ models under identical rules: 2 sessions per prompt for each model
   apart). Mixed-model pairs (gpt-6-luna director with a GPT-5.5 matcher and
   vice versa) would tell whether the director or the matcher is the weak link.
 - Sample sizes are small (2–3 sessions per condition).
+
+### Tier vs generation: gpt-5.6-luna and gpt-6-sol
+
+gpt-6-luna is priced as a budget model ($0.10/$0.50 per 1M input/output
+tokens vs GPT-5.5's $5/$30), so comparing it with GPT-5.5 mixes generation
+with tier. To separate them (2026-10-14, 3 sessions per prompt, same
+settings, about $9): **gpt-5.6-luna** keeps the budget tier and changes the
+generation; **gpt-6-sol** ($2/$10) keeps the generation and moves up a tier.
+Tiers are inferred from pricing; OpenAI does not publish model sizes. Both
+models passed the parameter check (reasoning effort `none`, structured
+output, images).
+
+| Model | Tier (by price) | Sessions | Implicit, overall accuracy | Explicit, overall accuracy | Explicit director words/turn |
+|---|---|---|---|---|---|
+| GPT-5.2 | middle | 2 | 96% | 100% | 13 |
+| GPT-5.5 | top | 2 | 100% | 98% | 4 |
+| gpt-6-sol | middle | 3 | 100% | 97% | 6 |
+| gpt-5.6-luna | budget | 3 | 97% | 68% | 5 |
+| gpt-6-luna | budget | 3 | 99% | 74% | 8 |
+
+gpt-5.6-luna explicit sessions by round: 75/75/75/58/67, 67/58/67/75/75,
+75/58/75/75/50. gpt-6-sol explicit: 92/92/100/100/100, 92/92/92/100/100,
+100/100/100/100/100.
+
+- **The explicit-prompt accuracy drop is a budget-tier effect, not a GPT-6
+  effect.** Both budget models drop 25–30 points under the explicit prompt,
+  and the mid-tier gpt-6-sol does not. Comparing gpt-6-luna with GPT-5.x and
+  calling the difference a generation effect would have been wrong.
+- **All models are near ceiling with the implicit prompt.**
+- **Director brevity alone does not explain the drop.** gpt-6-sol's explicit
+  directors are about as terse as the budget models' (6 vs 5–8 words per
+  turn), and it still scores 97%. This points to the budget models' matchers.
+  The mixed-model pairs described above would test that directly.
+- **No round hit the turn cap** (longest 44 turns). gpt-5.6-luna made 1 move
+  with `move: true`, and gpt-6-sol none.
