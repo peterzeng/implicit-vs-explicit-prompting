@@ -77,6 +77,28 @@ completed a move.
 
 Incomplete submits are still refused, as in the human interface.
 
+## Next: Human-Likeness
+
+Accuracy is near ceiling for mid- and top-tier models under version 3, so the
+next target is how closely AI–AI dialogue matches human–human dialogue. The
+plan has four steps:
+
+1. An open-model baseline: Qwen3-VL-235B-A22B-Instruct, served with vLLM on
+   Empire AI.
+2. LoRA SFT of Qwen3-VL-32B on the human–human transcripts.
+3. Filtered self-play using the game engine.
+4. Online RL, only if self-play stops improving.
+
+[`docs/human_likeness_plan.md`](docs/human_likeness_plan.md) has the details:
+
+- the human–human data source and its known problems
+- the proposed metrics and how to score a model's distance from humans
+- the GPU estimates for Empire AI
+- the code changes needed for a vLLM endpoint
+- a smoke-test checklist and the fine-tuning plan
+
+None of it is implemented yet.
+
 ## Licensing
 
 Code is MIT licensed (see `LICENSE`). The data in `data/` is intended to be
