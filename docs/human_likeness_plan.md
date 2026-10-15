@@ -6,9 +6,35 @@ rules and the GPT results so far, see `harness_changes.md`.
 
 ## Goal
 
-Accuracy is near ceiling for mid- and top-tier models under harness
-version 3 (see `harness_changes.md`). The next target is human-likeness: how
-closely AI–AI dialogue matches human–human dialogue on the same task.
+**The goal is AI that collaborates well with people.** In this task, a good
+partner:
+
+- picks up the human's terms;
+- asks for clarification when unsure, and not otherwise;
+- settles on shared, efficient names across rounds the way people do;
+- recovers from misunderstandings;
+- leaves the human with less work and a sense of being understood.
+
+Accuracy in AI–AI play is near ceiling for mid- and top-tier models under
+harness version 3 (see `harness_changes.md`). It says little about any of
+these.
+
+**Human-likeness in AI–AI play is a stand-in for that goal, not the goal
+itself.** We use it because:
+
+- human–human play is the best reference we have for how successful partners
+  communicate;
+- AI–AI sessions are cheap enough to iterate on.
+
+**Two cautions follow:**
+
+- **Not everything human is worth copying.** Some human behavior doesn't help
+  a partner, such as errors or off-task chat. Metrics should favor what
+  helps the partner: adaptation, useful clarification, conventions the
+  partner can follow.
+- **AI–AI optimization can produce shorthand only AIs understand.** Self-play
+  in particular can do this. So a model counts as improved only once it does
+  better **with human partners** (see "Evaluation with people" below).
 
 Plan, agreed with Owen:
 
@@ -17,6 +43,7 @@ Plan, agreed with Owen:
 2. Supervised fine-tuning (SFT) on the human–human transcripts.
 3. Filtered self-play (rejection sampling or DPO) using the game engine.
 4. Online RL, only if step 3 stops improving.
+5. Evaluation with people, in both roles.
 
 ## Human–human data
 
@@ -131,6 +158,36 @@ Calibrating and summarizing:
   folders on the Drive could let us score one role against a human partner.
 - **Don't optimize on the evaluation humans.** Once metrics are used as a
   reward (self-play), score against a held-out half of the human pairs.
+
+## Evaluation with people
+
+AI–AI metrics are used to develop models; human–AI sessions are the test.
+What we already have:
+
+- **The paper's human–AI data.** The Drive folder has Human-AI and AI-Human
+  sessions (human director with an AI matcher, and the reverse), plus
+  `human-ai-pairs.xlsx` and `ai-human-pairs.xlsx`. These are the baseline a
+  fine-tuned model has to beat.
+- **Partner ratings.** `consolidated_pairs.csv` has post-task survey columns
+  for each role: `partner_capable`, `partner_helpful`,
+  `partner_understood`, `partner_adapted`, `collaboration_improved`, and
+  `partner_human_vs_ai`. If the human–AI sessions have the same questions,
+  these give a human-rated outcome to compare directly.
+
+What to measure with human partners:
+
+| Measure | What it tells us |
+|---|---|
+| Accuracy | Whether the pair succeeds |
+| The human's effort: words, turns, time per round | Whether the AI makes the task easier |
+| Whether the human's own expressions compress across rounds | Whether a shared convention forms with the human, not just inside the AI |
+| Whether the AI takes up the human's terms | Adaptation to this particular partner |
+| Partner ratings | How the collaboration felt to the human |
+
+Running a human–AI study means a new data collection with the fine-tuned
+model behind the human interface, and probably an IRB amendment. Plan for this
+early. It is the
+step that decides whether the project worked.
 
 ## Open model choice
 
@@ -343,5 +400,8 @@ the main limit of the SFT step and is worth discussing with Owen.
   turn with no message? Humans can place baskets silently, so this fits the
   comparability standard in `harness_changes.md`. It would change the turn
   structure that turn-count metrics depend on.
+- **Human-AI interface.** Does the human–AI interface from the paper still
+  work with an open model behind it, and do its sessions record the same
+  survey questions as the human–human ones?
 - **Generalizing to new baskets.** Would we need more human–human data on a
   second basket set to test this properly?

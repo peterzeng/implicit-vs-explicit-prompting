@@ -29,7 +29,8 @@ of the paper.
 - `_static/` --- basket stimulus images and the observation dashboard assets.
 - `data/` --- transcripts and metrics (see `data/README.md`; release pending).
 - `emnlp-5rounds/`, `dotted-lines-4rounds/` --- generated result plots.
-- `figures/` --- figures used in the paper.
+- `figures/` --- figures used in the paper (`emnlp_fixed_identity/`) and
+  post-paper plots (e.g. `v3_models_sol/`, harness version 3).
 
 This repository includes our corrected version of the visual-context pipeline
 from Zeng et al. (2026): past-round transcripts and feedback images are kept in
@@ -77,17 +78,41 @@ completed a move.
 
 Incomplete submits are still refused, as in the human interface.
 
-## Next: Human-Likeness
+**Results under version 3** (five OpenAI models, 2–10 sessions per condition;
+details in `harness_changes.md`):
 
-Accuracy is near ceiling for mid- and top-tier models under version 3, so the
-next target is how closely AI–AI dialogue matches human–human dialogue. The
-plan has four steps:
+- **Implicit prompt:** every model scores about 92–100%.
+- **Explicit prompt:**
+  - Mid- and top-tier models score 97–100% and shorten their referring
+    expressions by 43–47% from round 1 to round 5, which reproduces the
+    paper's finding.
+  - The budget-tier models (gpt-6-luna, gpt-5.6-luna) drop to 68–77% and
+    compress less.
+  - No round hit the turn cap.
+
+## Next: Better Collaborators For People
+
+The long-term goal is AI partners that communicate well **with people**: they
+pick up a partner's terms, ask for clarification when unsure, and settle on
+shared, efficient names for things as a person would. That is what makes them
+easy for people to work with. Accuracy in AI–AI play is near ceiling and says
+little about this.
+
+The next phase uses human–human play as the reference and works in AI–AI play
+first, because AI–AI sessions are cheap to run and to iterate on:
 
 1. An open-model baseline: Qwen3-VL-235B-A22B-Instruct, served with vLLM on
    Empire AI.
 2. LoRA SFT of Qwen3-VL-32B on the human–human transcripts.
 3. Filtered self-play using the game engine.
 4. Online RL, only if self-play stops improving.
+5. Evaluation with people: human–AI sessions in both roles, compared with
+   the paper's human–AI and human–human data.
+
+Similarity to humans in AI–AI play is a stand-in for being a good partner to a
+person, not the goal itself. AI–AI optimization can also produce shorthand
+that only AIs understand. So a model counts as improved only once it holds up
+with human partners in step 5.
 
 [`docs/human_likeness_plan.md`](docs/human_likeness_plan.md) has the details:
 
@@ -189,7 +214,7 @@ nohup caffeinate -i python scripts/run_replication.py --model gpt-6-luna \
 - Sessions are saved under the prefixes `gpt6-luna-acl` and `gpt6-luna-cameron`, matching the paper's `gpt5.5-acl` naming.
 - Runs are resumable: re-running the same command counts the complete exports and only runs the missing sessions. Stalled sessions are topped up automatically (`--max-passes`).
 - `--workers` sets the number of parallel sessions per condition (default 2). Each worker has its own SQLite file and log under `data/runs/<prefix>/`.
-- At the end, the script prints token totals, then runs `analyze_metrics.py` with GPT-5.5 referring-expression extraction (as in the paper) and plots to `figures/replication_<model>/`.
+- At the end, the script prints token totals, then runs `analyze_metrics.py` with GPT-5.5 referring-expression extraction (the default, as in the paper) and plots to `figures/replication_<model>/`. Post-paper analyses use gpt-6-sol as the extractor (`--extractor-model gpt-6-sol`; see `docs/harness_changes.md`). Every condition being compared must use the same extractor.
 - `--baseline-metrics` adds the paper's GPT-5.2/5.5 rows from their existing metrics CSV instead of re-extracting them, so the baseline numbers stay as published. Those runs used the paper's rules, so treat the overlay as a rough reference, not a controlled comparison.
 - `--max-turns-per-round` sets the turn cap (default 120).
 
@@ -343,3 +368,14 @@ export AI_MATCHER_MODEL="gpt-5.5"
 ```
 
 For headless runs, prefer the CLI flags shown above. OpenAI models use `OPENAI_API_KEY`; Gemini models use `GEMINI_API_KEY`.
+
+Open models served behind an OpenAI-compatible endpoint (e.g. vLLM) are
+selected with `OPENAI_API_BASE`. This path has not been tested yet, and there
+are known issues to fix first (see "Code changes needed for a vLLM endpoint"
+in `docs/human_likeness_plan.md`):
+
+- The prompts use the `developer` role.
+- No `max_tokens` cap is set.
+- `scripts/analyze_metrics.py` builds its own client, and that client reads
+  `OPENAI_BASE_URL`. Set `OPENAI_API_BASE` only, or the referring-expression
+  extraction is also sent to the local server.
