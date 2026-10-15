@@ -164,15 +164,36 @@ Calibrating and summarizing:
 AI–AI metrics are used to develop models; human–AI sessions are the test.
 What we already have:
 
-- **The paper's human–AI data.** The Drive folder has Human-AI and AI-Human
-  sessions (human director with an AI matcher, and the reverse), plus
-  `human-ai-pairs.xlsx` and `ai-human-pairs.xlsx`. These are the baseline a
-  fine-tuned model has to beat.
-- **Partner ratings.** `consolidated_pairs.csv` has post-task survey columns
-  for each role: `partner_capable`, `partner_helpful`,
-  `partner_understood`, `partner_adapted`, `collaboration_improved`, and
-  `partner_human_vs_ai`. If the human–AI sessions have the same questions,
-  these give a human-rated outcome to compare directly.
+- **The paper's human–AI data** (public Drive folder
+  "LVLMs-and-Humans-Ground-Differently"). These are the baseline a fine-tuned
+  model has to beat.
+  - `human-ai-pairs.xlsx`: 22 pairs, human director with an AI matcher.
+  - `ai-human-pairs.xlsx`: 17 pairs, AI director with a human matcher.
+  - The `*-with-times.xlsx` versions add timing columns.
+  - Both use basket set 5 in the human–AI/AI–AI order, which matches
+    `grids_presets5.json` for rounds 1–4.
+  - The AI model is not recorded in these files; get it from the paper.
+- **Partner ratings.** All three conditions ask the same post-task survey
+  (checked 2026-10-15). It has 5 items on a 1–5 scale:
+  - `partner_capable`
+  - `partner_helpful`
+  - `partner_understood`
+  - `partner_adapted`
+  - `collaboration_improved`
+
+  It also has `partner_human_vs_ai` (0–100), a free-text comment, and AI
+  familiarity. Only the human's columns are filled: the `director_*`
+  columns in human–AI and the `matcher_*` columns in AI–human.
+
+  | Item | Human–human, director / matcher (n=32) | Human director rating AI matcher (n=22) | Human matcher rating AI director (n=17) |
+  |---|---|---|---|
+  | `partner_capable` = 5 | 27 / 27 | 2 | 3 |
+  | `partner_adapted` = 5 | 27 / 24 | 3 | 3 |
+  | `partner_human_vs_ai` = 0 | 0 / 0 | 14 | 13 |
+
+  People rate human partners near the top of the scale. They rate AI
+  partners low and mostly identify them as AI. There is plenty of room for
+  improvement, and the ratings are a direct outcome measure.
 
 What to measure with human partners:
 
@@ -185,8 +206,8 @@ What to measure with human partners:
 | Partner ratings | How the collaboration felt to the human |
 
 Running a human–AI study means a new data collection with the fine-tuned
-model behind the human interface, and probably an IRB amendment. Plan for this
-early. It is the
+model behind the human interface. Peter will raise the IRB question with
+Susan. Plan for this early. It is the
 step that decides whether the project worked.
 
 ## Open model choice
@@ -401,7 +422,6 @@ the main limit of the SFT step and is worth discussing with Owen.
   comparability standard in `harness_changes.md`. It would change the turn
   structure that turn-count metrics depend on.
 - **Human-AI interface.** Does the human–AI interface from the paper still
-  work with an open model behind it, and do its sessions record the same
-  survey questions as the human–human ones?
+  work with an open model behind it?
 - **Generalizing to new baskets.** Would we need more human–human data on a
   second basket set to test this properly?
