@@ -1,0 +1,31 @@
+condition,metric,slope
+"Implicit Prompt, GPT-5.5",accuracy,0.0
+"Implicit Prompt, GPT-5.5",words,-5.699999999999999
+"Implicit Prompt, GPT-5.5",turns,0.0
+"Implicit Prompt, GPT-5.5",re_words,-7.499999999999998
+"Implicit Prompt, GPT-5.5",relative_lexical_overlap,0.007317928610400525
+"Implicit Prompt, GPT-6 Sol",accuracy,0.0
+"Implicit Prompt, GPT-6 Sol",words,-2.7
+"Implicit Prompt, GPT-6 Sol",turns,0.0
+"Implicit Prompt, GPT-6 Sol",re_words,-11.466666666666667
+"Implicit Prompt, GPT-6 Sol",relative_lexical_overlap,0.029637574067673
+"Implicit Prompt, GPT-6 Luna",accuracy,0.16666666666666627
+"Implicit Prompt, GPT-6 Luna",words,1.5999999999999999
+"Implicit Prompt, GPT-6 Luna",turns,-0.07999999999999999
+"Implicit Prompt, GPT-6 Luna",re_words,-6.52
+"Implicit Prompt, GPT-6 Luna",relative_lexical_overlap,0.019985493917545564
+"Explicit Prompt, GPT-5.5",accuracy,1.2500000000000013
+"Explicit Prompt, GPT-5.5",words,-10.999999999999998
+"Explicit Prompt, GPT-5.5",turns,0.0
+"Explicit Prompt, GPT-5.5",re_words,-7.6
+"Explicit Prompt, GPT-5.5",relative_lexical_overlap,0.018541666666666682
+"Explicit Prompt, GPT-6 Sol",accuracy,1.6666666666666685
+"Explicit Prompt, GPT-6 Sol",words,-13.933333333333332
+"Explicit Prompt, GPT-6 Sol",turns,-0.19999999999999998
+"Explicit Prompt, GPT-6 Sol",re_words,-9.433333333333332
+"Explicit Prompt, GPT-6 Sol",relative_lexical_overlap,0.016607142857142827
+"Explicit Prompt, GPT-6 Luna",accuracy,0.7499999999999994
+"Explicit Prompt, GPT-6 Luna",words,14.329999999999998
+"Explicit Prompt, GPT-6 Luna",turns,0.9200000000000003
+"Explicit Prompt, GPT-6 Luna",re_words,-0.83
+"Explicit Prompt, GPT-6 Luna",relative_lexical_overlap,0.015170692821129468
